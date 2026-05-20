@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CircularProgress from '../components/ui/CircularProgress';
-import { getProfile } from '../utils/supabaseClient';
+import { useProfile } from '../context/ProfileContext';
 import { AVAILABLE_ROLES } from '../data/mockData';
 
 interface PreviousSession {
@@ -14,38 +14,30 @@ interface PreviousSession {
 
 export default function InterviewPrep() {
   const navigate = useNavigate();
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const { profile, loading } = useProfile();
   const [targetRole, setTargetRole] = useState('Senior Cloud Architect');
   const [interviewType, setInterviewType] = useState('Behavioral (STAR Framework)');
   const [prevSession, setPrevSession] = useState<PreviousSession | null>(null);
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const data = await getProfile();
-        if (data) {
-          if (data.target_role) {
-            setTargetRole(data.target_role);
-          }
-          if (data.interview_session) {
-            setPrevSession(data.interview_session);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load interview profile from Supabase:", e);
-      } finally {
-        setLoadingProfile(false);
+    if (profile) {
+      if (profile.target_role) {
+        setTargetRole(profile.target_role);
+      }
+      if (profile.interview_session) {
+        setPrevSession(profile.interview_session);
+      } else {
+        setPrevSession(null);
       }
     }
-    loadData();
-  }, []);
+  }, [profile]);
 
   const handleLaunchSimulator = () => {
     // Pass config through React Router location state rather than localStorage
     navigate('/interview/simulator', { state: { targetRole, interviewType } });
   };
 
-  if (loadingProfile) {
+  if (loading) {
     return (
       <div className="min-h-[400px] flex items-center justify-center animate-pulse">
         <div className="text-center space-y-4">

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeResume, DynamicResumeFeedback } from '../utils/aiService';
-import { getProfile, saveResumeAnalysis, upsertProfile, SupabaseProfile } from '../utils/supabaseClient';
 import { AVAILABLE_ROLES } from '../data/mockData';
+import { useProfile } from '../context/ProfileContext';
 
 export default function ResumeLab() {
-  const [profile, setProfile] = useState<SupabaseProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const { profile, loading, updateProfile } = useProfile();
   const [uploadState, setUploadState] = useState<'idle' | 'scanning' | 'results'>('idle');
   const [resumeText, setResumeText] = useState('');
   const [targetRole, setTargetRole] = useState('Senior Cloud Architect');
@@ -15,27 +14,19 @@ export default function ResumeLab() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    async function fetchProfileData() {
-      try {
-        const data = await getProfile();
-        setProfile(data);
-        if (data) {
-          if (data.target_role) {
-            setTargetRole(data.target_role);
-          }
-          if (data.resume_analysis) {
-            setAnalysis(data.resume_analysis);
-            setUploadState('results');
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load profile in Resume Lab:", e);
-      } finally {
-        setLoadingProfile(false);
+    if (profile) {
+      if (profile.target_role) {
+        setTargetRole(profile.target_role);
+      }
+      if (profile.resume_analysis) {
+        setAnalysis(profile.resume_analysis);
+        setUploadState('results');
+      } else {
+        setAnalysis(null);
+        setUploadState('idle');
       }
     }
-    fetchProfileData();
-  }, []);
+  }, [profile]);
 
   const handleStartAnalysis = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,19 +37,13 @@ export default function ResumeLab() {
       const data = await analyzeResume(resumeText, targetRole);
       setAnalysis(data);
       
-      // Save directly to Supabase
-      await saveResumeAnalysis(data);
-      
-      // Keep target role in sync
-      const updatedProfile = await upsertProfile({
-        target_role: targetRole
+      // Save directly via Context to update DB and global states in sync
+      await updateProfile({
+        target_role: targetRole,
+        resume_analysis: data
       });
-      setProfile(updatedProfile);
       
       setUploadState('results');
-      
-      // Dispatch custom event to notify Sidebar/Layout
-      window.dispatchEvent(new Event('profile-updated'));
     } catch (err) {
       console.error(err);
       setUploadState('idle');
@@ -70,15 +55,15 @@ export default function ResumeLab() {
     setAnalysis(null);
     setUploadState('idle');
     try {
-      await saveResumeAnalysis(null);
-      // Dispatch custom event to notify Sidebar/Layout
-      window.dispatchEvent(new Event('profile-updated'));
+      await updateProfile({
+        resume_analysis: null
+      });
     } catch (e) {
       console.error("Failed to reset analysis in Supabase:", e);
     }
   };
 
-  if (loadingProfile) {
+  if (loading) {
     return (
       <div className="min-h-[400px] flex items-center justify-center animate-pulse">
         <div className="text-center space-y-4">

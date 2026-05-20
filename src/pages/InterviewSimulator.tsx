@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { generateInterviewQuestions, generateInterviewFeedback, DynamicInterviewQuestion, DynamicInterviewFeedback } from '../utils/aiService';
 import CircularProgress from '../components/ui/CircularProgress';
-import { getProfile, saveInterviewSession, upsertProfile } from '../utils/supabaseClient';
+import { saveInterviewSession } from '../utils/supabaseClient';
+import { useProfile } from '../context/ProfileContext';
 
 interface ChatMessage {
   sender: 'ai' | 'user';
@@ -14,6 +15,7 @@ interface ChatMessage {
 export default function InterviewSimulator() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { profile, updateProfile } = useProfile();
   
   // Session Configuration
   const [config, setConfig] = useState(() => {
@@ -34,13 +36,50 @@ export default function InterviewSimulator() {
   const [inputValue, setInputValue] = useState('');
   
   const [feedbackHistory, setFeedbackHistory] = useState<DynamicInterviewFeedback[]>([]);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [sessionFinished, setSessionFinished] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.lang = 'en-US';
+
+      rec.onstart = () => {
+        setIsRecording(true);
+      };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        if (transcript) {
+          setInputValue(prev => {
+            const trimmed = prev.trim();
+            return trimmed ? `${trimmed} ${transcript.trim()}` : transcript.trim();
+          });
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsRecording(false);
+      };
+
+      rec.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = rec;
+    }
+  }, []);
 
   // Load questions on mount
   useEffect(() => {
@@ -49,7 +88,6 @@ export default function InterviewSimulator() {
       try {
         let activeRole = config.targetRole;
         if (!location.state || !location.state.targetRole) {
-          const profile = await getProfile();
           if (profile && profile.target_role) {
             activeRole = profile.target_role;
             setConfig({
@@ -77,7 +115,7 @@ export default function InterviewSimulator() {
       }
     }
     loadSession();
-  }, [config.targetRole, location.state]);
+  }, [config.targetRole, location.state, profile]);
 
   // Keep a running session timer
   useEffect(() => {
@@ -100,14 +138,40 @@ export default function InterviewSimulator() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleMicSimulate = () => {
-    if (inputValue) return;
-    setInputValue("Certainly. In my last project, we had to migrate a monolithic backend to serverless cloud infrastructure on a tight 3-week deadline. To maintain high availability, I designed parallel deployment modules using AWS Lambda with optimized API Gateway throttling rates. This mitigated our database bottleneck and resulted in a 40% latency saving under high load.");
+  const handleMicToggle = () => {
+    if (!recognitionRef.current) {
+      // Speech recognition not supported or denied. Fallback to mock text.
+      if (inputValue) return;
+      setInputValue("Certainly. In my last project, we had to migrate a monolithic backend to serverless cloud infrastructure on a tight 3-week deadline. To maintain high availability, I designed parallel deployment modules using AWS Lambda with optimized API Gateway throttling rates. This mitigated our database bottleneck and resulted in a 40% latency saving under high load.");
+      return;
+    }
+
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Failed to start speech recognition:", err);
+      }
+    }
   };
 
   const handleSubmitAnswer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || submitting || sessionFinished || questions.length === 0) return;
+
+    // Stop recording if active when submitting
+    if (isRecording && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.error(err);
+      }
+      setIsRecording(false);
+    }
 
     const currentQuestion = questions[currentIdx].text;
     const userAnswer = inputValue.trim();
@@ -176,14 +240,13 @@ export default function InterviewSimulator() {
           coachingTips: tips.length > 0 ? tips : ["Focus on quantifying metrics using the STAR structure."]
         };
         
-        // Save session history and update user streak/XP in Supabase
+        // Save session history and update user streak/XP in Supabase via context
         await saveInterviewSession(historyRecord);
         
-        const currentProfile = await getProfile();
-        if (currentProfile) {
-          const newStreak = (currentProfile.streak || 0) + 1;
-          const newXp = (currentProfile.xp || 0) + 150;
-          await upsertProfile({
+        if (profile) {
+          const newStreak = (profile.streak || 0) + 1;
+          const newXp = (profile.xp || 0) + 150;
+          await updateProfile({
             streak: newStreak,
             xp: newXp
           });
@@ -378,16 +441,16 @@ export default function InterviewSimulator() {
               <form onSubmit={handleSubmitAnswer} className="p-3 bg-surface border-t border-surface-container-high flex gap-3 items-center shrink-0">
                 <button
                   type="button"
-                  onClick={handleMicSimulate}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors shrink-0 shadow-sm cursor-pointer ${
-                    isMuted
-                      ? 'bg-error-container text-on-error-container hover:bg-error hover:text-on-error'
-                      : 'bg-primary text-on-primary hover:bg-primary/95 ai-glow'
+                  onClick={handleMicToggle}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 shadow-sm cursor-pointer ${
+                    isRecording
+                      ? 'bg-error text-on-error animate-pulse ring-4 ring-error/30 shadow-lg'
+                      : 'bg-primary text-on-primary hover:bg-primary/95 hover:scale-105 ai-glow'
                   }`}
-                  title="Simulate Voice Input"
+                  title={isRecording ? "Stop voice recording" : "Speak your response (Web Speech)"}
                 >
                   <span className="material-symbols-outlined text-xl">
-                    {isMuted ? 'mic_off' : 'mic'}
+                    {isRecording ? 'graphic_eq' : 'mic'}
                   </span>
                 </button>
 

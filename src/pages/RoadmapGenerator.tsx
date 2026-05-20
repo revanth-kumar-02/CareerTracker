@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateRoadmap } from '../utils/aiService';
-import { getProfile, saveRoadmap, upsertProfile } from '../utils/supabaseClient';
+import { saveRoadmap } from '../utils/supabaseClient';
 import { AVAILABLE_ROLES } from '../data/mockData';
+import { useProfile } from '../context/ProfileContext';
 
 export default function RoadmapGenerator() {
   const navigate = useNavigate();
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const { profile, loading, updateProfile } = useProfile();
   
   // Customization Form states
   const [targetRole, setTargetRole] = useState(AVAILABLE_ROLES[0]);
@@ -28,22 +29,10 @@ export default function RoadmapGenerator() {
   ];
 
   useEffect(() => {
-    async function initPage() {
-      try {
-        const data = await getProfile();
-        if (data) {
-          if (data.target_role) {
-            setTargetRole(data.target_role);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load user profile in generator page:", e);
-      } finally {
-        setLoadingProfile(false);
-      }
+    if (profile?.target_role) {
+      setTargetRole(profile.target_role);
     }
-    initPage();
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     let interval: any;
@@ -70,14 +59,11 @@ export default function RoadmapGenerator() {
       // 2. Save roadmap JSON directly to Supabase
       await saveRoadmap(data);
 
-      // 3. Keep profile synchronized (upserting target role and initial dynamic briefing)
-      await upsertProfile({
+      // 3. Keep profile synchronized (updating target role and initial dynamic briefing via context)
+      await updateProfile({
         target_role: targetRole,
         briefing: `Dynamic intelligence briefing active for your path to become a ${targetRole}. Success probability calculated at ${data.successProbability}% based on market telemetry.`
       });
-
-      // Dispatch custom event to notify Layout sidebar
-      window.dispatchEvent(new Event('profile-updated'));
 
       // 4. Redirect user to the main Career Roadmap page to display active tracker
       navigate('/roadmap');
@@ -87,7 +73,7 @@ export default function RoadmapGenerator() {
     }
   };
 
-  if (loadingProfile) {
+  if (loading) {
     return (
       <div className="min-h-[400px] flex items-center justify-center animate-pulse">
         <div className="text-center space-y-4">

@@ -188,6 +188,11 @@ export interface DynamicMarketData {
     boxHeight: string;
     boxBottom: string;
     medianTop: string;
+    minSalary: number; // raw USD integer e.g., 90000
+    maxSalary: number; // raw USD integer e.g., 380000
+    medianSalary: number; // raw USD integer e.g., 220000
+    p25Salary: number; // raw USD integer e.g., 150000
+    p75Salary: number; // raw USD integer e.g., 280000
   };
   skillPremiums: {
     name: string;
@@ -530,6 +535,11 @@ export async function generateMarketInsights(
         boxHeight: string; // CSS style height percentage (e.g. "35%") representing 25th-75th core range
         boxBottom: string; // CSS style bottom percentage (e.g. "20%") representing starting position of 25th percentile
         medianTop: string; // CSS style top percentage (e.g. "45%") representing median line offset from top of the box
+        minSalary: number; // raw 10th percentile USD integer (e.g. 110000)
+        maxSalary: number; // raw 90th percentile USD integer (e.g. 370000)
+        medianSalary: number; // raw 50th percentile median USD integer (e.g. 230000)
+        p25Salary: number; // raw 25th percentile USD integer (e.g. 170000)
+        p75Salary: number; // raw 75th percentile USD integer (e.g. 290000)
       }; // These values must place whiskerBottom < boxBottom < medianTop < (boxBottom + boxHeight) < (whiskerBottom + whiskerHeight) for visual correctness.
       skillPremiums: {
         name: string; // Skill name e.g. "PyTorch / Fine-tuning", "Kubernetes", "System Design"
@@ -548,13 +558,38 @@ export async function generateMarketInsights(
     Note on CSS box models: The whisker lines and boxes are drawn in a vertical chart. Ensure your bottom and height percentages align properly so the rendering is beautifully aligned and visually accurate.
   `;
 
+  let fallbackMin = 120000;
+  let fallbackMax = 280000;
+  let fallbackMedian = 195000;
+  let fallbackP25 = 150000;
+  let fallbackP75 = 240000;
+
+  if (experience.includes('L4')) {
+    fallbackMin = 90000;
+    fallbackMax = 180000;
+    fallbackMedian = 130000;
+    fallbackP25 = 110000;
+    fallbackP75 = 150000;
+  } else if (experience.includes('L6')) {
+    fallbackMin = 180000;
+    fallbackMax = 440000;
+    fallbackMedian = 310000;
+    fallbackP25 = 240000;
+    fallbackP75 = 370000;
+  }
+
   const fallback: DynamicMarketData = {
     salaryPercentiles: {
       whiskerBottom: '15%',
       whiskerHeight: '65%',
       boxHeight: '40%',
       boxBottom: '25%',
-      medianTop: '45%'
+      medianTop: '45%',
+      minSalary: fallbackMin,
+      maxSalary: fallbackMax,
+      medianSalary: fallbackMedian,
+      p25Salary: fallbackP25,
+      p75Salary: fallbackP75
     },
     skillPremiums: [
       { name: 'Advanced System Architecture', percentage: '+24%', colorClass: 'bg-primary' },

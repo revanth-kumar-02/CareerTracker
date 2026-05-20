@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ProfileProvider } from './context/ProfileContext';
 
 // Layouts
 import LandingLayout from './components/Layout/LandingLayout';
@@ -18,30 +19,33 @@ import ProfileSettings from './pages/ProfileSettings';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Public Routes (Landing Layout) */}
-        <Route element={<LandingLayout />}>
-          <Route path="/" element={<Landing />} />
-        </Route>
+    <ProfileProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Routes (Landing Layout) */}
+          <Route element={<LandingLayout />}>
+            <Route path="/" element={<Landing />} />
+          </Route>
 
-        {/* Member/Dashboard Routes (Dashboard Layout) */}
-        <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/discovery" element={<MarketInsights />} />
-          <Route path="/roadmap" element={<CareerRoadmap />} />
-          <Route path="/roadmap/generator" element={<RoadmapGenerator />} />
-          <Route path="/resume" element={<ResumeLab />} />
-          <Route path="/resume/feedback" element={<ResumeFeedback />} />
-          <Route path="/interview" element={<InterviewPrep />} />
-          <Route path="/interview/simulator" element={<InterviewSimulator />} />
-          <Route path="/profile" element={<ProfileSettings />} />
-        </Route>
+          {/* Member/Dashboard Routes (Dashboard Layout) */}
+          <Route element={<DashboardLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/discovery" element={<MarketInsights />} />
+            <Route path="/roadmap" element={<CareerRoadmap />} />
+            <Route path="/roadmap/generator" element={<RoadmapGenerator />} />
+            <Route path="/resume" element={<ResumeLab />} />
+            <Route path="/resume/feedback" element={<ResumeFeedback />} />
+            <Route path="/interview" element={<InterviewPrep />} />
+            <Route path="/interview/simulator" element={<InterviewSimulator />} />
+            <Route path="/profile" element={<ProfileSettings />} />
+          </Route>
 
-        {/* Catch-all fallback redirection */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Catch-all fallback redirection */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ProfileProvider>
   );
 }
+
 

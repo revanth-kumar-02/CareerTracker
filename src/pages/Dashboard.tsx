@@ -2,61 +2,38 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import CircularProgress from '../components/ui/CircularProgress';
 import { companies, AVAILABLE_ROLES } from '../data/mockData';
-import { getProfile, upsertProfile, SupabaseProfile } from '../utils/supabaseClient';
+import { useProfile } from '../context/ProfileContext';
 
 export default function Dashboard() {
-  const [profile, setProfile] = useState<SupabaseProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { profile, loading, updateProfile } = useProfile();
 
-  // Edit / Onboarding state
-  const [isEditing, setIsEditing] = useState(false);
+  // Onboarding form state
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('');
-
-  const fetchProfileData = async () => {
-    try {
-      const data = await getProfile();
-      setProfile(data);
-      if (data) {
-        setEditName(data.name || '');
-        setEditRole(data.target_role || '');
-      }
-    } catch (e) {
-      console.error("Failed to load profile in dashboard:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
 
   useEffect(() => {
-    fetchProfileData();
-  }, []);
+    if (profile) {
+      setEditName(profile.name || '');
+      setEditRole(profile.target_role || '');
+    }
+  }, [profile]);
 
-  const handleSaveProfile = async () => {
+  const handleOnboardingSave = async () => {
     if (!editName.trim() || !editRole.trim()) return;
 
-    setLoading(true);
+    setOnboardingLoading(true);
     try {
-      const updated = await upsertProfile({
+      await updateProfile({
         name: editName.trim(),
         target_role: editRole.trim(),
         briefing: `Dynamic intelligence briefing active for your path to become a ${editRole.trim()}. High-demand competencies like System Architecture are surging +34% in regional hubs.`
       });
-      setProfile(updated);
-      setIsEditing(false);
-
-      // Dispatch custom event to notify Sidebar/Layout
-      window.dispatchEvent(new Event('profile-updated'));
     } catch (e) {
-      console.error("Failed to save profile:", e);
+      console.error("Failed to save onboarding profile:", e);
     } finally {
-      setLoading(false);
+      setOnboardingLoading(false);
     }
-  };
-
-  // Helper to trigger profile-updated manually
-  const triggerRefresh = () => {
-    window.dispatchEvent(new Event('profile-updated'));
   };
 
   // Loading skeleton state
@@ -127,12 +104,12 @@ export default function Dashboard() {
           </div>
 
           <button
-            onClick={handleSaveProfile}
-            disabled={!editName.trim() || !editRole.trim() || loading}
+            onClick={handleOnboardingSave}
+            disabled={!editName.trim() || !editRole.trim() || onboardingLoading}
             className="w-full py-3 bg-primary text-on-primary rounded-xl text-sm font-bold hover:bg-primary/95 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-base">rocket_launch</span>
-            {loading ? 'Initializing Engine...' : 'Initialize AI Career Engine'}
+            {onboardingLoading ? 'Initializing Engine...' : 'Initialize AI Career Engine'}
           </button>
         </div>
       </div>
@@ -193,68 +170,21 @@ export default function Dashboard() {
             </span>
           </div>
 
-          {isEditing ? (
-            <div className="bg-surface-container-lowest border border-surface-container p-4 rounded-xl shadow-premium max-w-xl space-y-3.5 mt-2">
-              <h4 className="text-xs font-bold text-primary uppercase tracking-wider">Configure Professional Vector</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Name</label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full bg-surface border border-outline-variant/30 rounded-lg px-3 py-1.5 text-xs font-semibold text-on-surface focus:border-primary outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Target Role</label>
-                  <select
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value)}
-                    className="w-full bg-surface border border-outline-variant/30 rounded-lg px-3 py-1.5 text-xs font-semibold text-on-surface focus:border-primary outline-none cursor-pointer"
-                  >
-                    <option value="" disabled>Select a role...</option>
-                    {AVAILABLE_ROLES.map((role) => (
-                      <option key={role} value={role}>{role}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end pt-1">
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="px-3 py-1.5 bg-surface-container text-on-surface-variant rounded-lg text-xs font-bold hover:bg-surface-container-high transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveProfile}
-                  className="px-3.5 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary/95 shadow-sm transition-all"
-                >
-                  Save Profile
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="group relative">
-              <h1 className="text-3xl md:text-[44px] font-extrabold leading-tight tracking-tight text-on-surface mb-2 flex items-center gap-2">
-                Welcome back, {profile.name}
-                <button
-                  onClick={() => {
-                    setEditName(profile.name);
-                    setEditRole(profile.target_role);
-                    setIsEditing(true);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-all text-xs flex items-center gap-1 font-bold shrink-0 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-sm font-bold">edit</span>
-                  Edit Profile
-                </button>
-              </h1>
-              <p className="text-base text-on-surface-variant max-w-2xl">{profile.briefing}</p>
-            </div>
-          )}
+          <div className="group relative">
+            <h1 className="text-3xl md:text-[44px] font-extrabold leading-tight tracking-tight text-on-surface mb-2 flex items-center gap-2">
+              Welcome back, {profile.name}
+              <Link
+                to="/profile"
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-all text-xs flex items-center gap-1 font-bold shrink-0 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm font-bold">settings</span>
+                Edit Profile
+              </Link>
+            </h1>
+            <p className="text-base text-on-surface-variant max-w-2xl">{profile.briefing}</p>
+          </div>
         </div>
+
 
         {/* Global Stats Widget */}
         <div className="flex gap-4 w-full md:w-auto shrink-0">

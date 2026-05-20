@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { generateMarketInsights, DynamicMarketData } from '../utils/aiService';
 import { trendingRoles } from '../data/mockData';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getProfile } from '../utils/supabaseClient';
+import { useProfile } from '../context/ProfileContext';
 
 export default function MarketInsights() {
   const navigate = useNavigate();
+  const { profile } = useProfile();
   const [role, setRole] = useState('AI Engineer');
   const [experience, setExperience] = useState('L5 (Senior)');
   const [location, setLocation] = useState('San Francisco');
@@ -19,30 +20,19 @@ export default function MarketInsights() {
     'DevOps Engineer',
     'Product Manager'
   ]);
-  const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
-    async function loadProfile() {
-      try {
-        const profile = await getProfile();
-        if (profile && profile.target_role) {
-          const userRole = profile.target_role;
-          setAvailableRoles(prev => {
-            if (!prev.includes(userRole)) {
-              return [...prev, userRole];
-            }
-            return prev;
-          });
-          setRole(userRole);
+    if (profile && profile.target_role) {
+      const userRole = profile.target_role;
+      setAvailableRoles(prev => {
+        if (!prev.includes(userRole)) {
+          return [...prev, userRole];
         }
-      } catch (e) {
-        console.error("Failed to load profile in Market Insights:", e);
-      } finally {
-        setLoadingProfile(false);
-      }
+        return prev;
+      });
+      setRole(userRole);
     }
-    loadProfile();
-  }, []);
+  }, [profile]);
 
   const [loading, setLoading] = useState(false);
   const [marketData, setMarketData] = useState<DynamicMarketData>({
@@ -51,7 +41,12 @@ export default function MarketInsights() {
       whiskerHeight: '65%',
       boxHeight: '40%',
       boxBottom: '25%',
-      medianTop: '45%'
+      medianTop: '45%',
+      minSalary: 120000,
+      maxSalary: 280000,
+      medianSalary: 195000,
+      p25Salary: 150000,
+      p75Salary: 240000
     },
     skillPremiums: [
       { name: 'PyTorch / LLM Fine-tuning', percentage: '+28%', colorClass: 'bg-primary' },
@@ -117,6 +112,36 @@ export default function MarketInsights() {
     }
     updateInsights();
   }, [role, experience, location]);
+
+  // Dynamic compensation whisker helper
+  const salaryPercentiles = marketData?.salaryPercentiles || {};
+  const minVal = salaryPercentiles.minSalary || 120000;
+  const maxVal = salaryPercentiles.maxSalary || 280000;
+  const medianVal = salaryPercentiles.medianSalary || 195000;
+  const p25Val = salaryPercentiles.p25Salary || 150000;
+  const p75Val = salaryPercentiles.p75Salary || 240000;
+
+  // Let's establish a dynamic axis range
+  const range = maxVal - minVal;
+  const pad = range * 0.15 || 30000; // 15% padding
+  const axisMin = Math.max(0, Math.floor(Math.max(0, minVal - pad) / 20000) * 20000);
+  const axisMax = Math.ceil((maxVal + pad) / 20000) * 20000;
+  const axisDiff = axisMax - axisMin || 1;
+
+  // Now let's calculate perfect CSS bounds
+  const whiskerBottomPct = `${((minVal - axisMin) / axisDiff) * 100}%`;
+  const whiskerHeightPct = `${((maxVal - minVal) / axisDiff) * 100}%`;
+  const boxBottomPct = `${((p25Val - axisMin) / axisDiff) * 100}%`;
+  const boxHeightPct = `${((p75Val - p25Val) / axisDiff) * 100}%`;
+  // medianTop is offset from the top of the box: top of box is p75Val, median is medianVal
+  const medianTopPct = `${((p75Val - medianVal) / (p75Val - p25Val || 1)) * 100}%`;
+
+  // Dynamic Y Axis labels
+  const steps = 4;
+  const labels: number[] = [];
+  for (let i = steps - 1; i >= 0; i--) {
+    labels.push(axisMin + (axisDiff * i) / (steps - 1));
+  }
 
   return (
     <div className="space-y-8 animate-fade-in pb-16">
@@ -243,13 +268,37 @@ export default function MarketInsights() {
           </div>
 
           {/* Whisker Box Chart Rendering with Dynamic Loading transition */}
-          <div className="relative h-64 w-full flex items-end justify-around pb-8 border-b border-surface-container-high">
+          <div className="relative h-64 w-full flex items-end justify-around pb-8 border-b border-surface-container-high group/chart">
+            {/* Absolute hover details overlay */}
+            <div className="absolute right-4 top-4 bg-surface-container-high border border-outline-variant/40 rounded-xl p-3.5 shadow-premium text-xs text-on-surface font-semibold space-y-1.5 opacity-0 group-hover/chart:opacity-100 transition-opacity duration-300 pointer-events-none z-30 select-none max-w-xs">
+              <div className="text-[10px] font-extrabold text-primary uppercase tracking-wider mb-1">Calibrated Compensation</div>
+              <div className="flex justify-between gap-6">
+                <span className="text-on-surface-variant font-medium">90th Percentile:</span>
+                <span className="text-on-surface font-bold">${maxVal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-on-surface-variant font-medium">75th Percentile:</span>
+                <span className="text-on-surface font-bold">${p75Val.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-primary font-bold">50th (Median):</span>
+                <span className="text-primary font-black">${medianVal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-on-surface-variant font-medium">25th Percentile:</span>
+                <span className="text-on-surface font-bold">${p25Val.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-on-surface-variant font-medium">10th Percentile:</span>
+                <span className="text-on-surface font-bold">${minVal.toLocaleString()}</span>
+              </div>
+            </div>
+
             {/* Y Axis Labels */}
             <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-[9px] font-bold text-outline pr-3 w-14 text-right border-r border-surface-container-high shrink-0">
-              <span>$400k</span>
-              <span>$300k</span>
-              <span>$200k</span>
-              <span>$100k</span>
+              {labels.map((val, idx) => (
+                <span key={idx}>${Math.round(val / 1000)}k</span>
+              ))}
             </div>
 
             {loading ? (
@@ -260,19 +309,19 @@ export default function MarketInsights() {
 
             {/* Dynamic Wisker Chart */}
             <div className="ml-16 w-full flex justify-around items-end h-full relative pl-4 md:pl-12 pr-4">
-              <div className="group relative flex flex-col items-center w-full max-w-[120px] h-full justify-end">
+              <div className="group relative flex flex-col items-center w-full max-w-[120px] h-full justify-end cursor-help">
                 {/* Whisker Line (10th-90th) */}
                 <div
                   className="absolute w-[3px] bg-primary/45 rounded-full z-0 transition-all duration-300"
-                  style={{ bottom: marketData.salaryPercentiles.whiskerBottom, height: marketData.salaryPercentiles.whiskerHeight }}
+                  style={{ bottom: whiskerBottomPct, height: whiskerHeightPct }}
                 />
                 {/* Box (25th-75th) */}
                 <div
                   className="relative z-10 w-full bg-gradient-to-t from-primary to-primary/60 rounded-lg border border-primary/20 shadow-md transition-all duration-500 hover:-translate-y-0.5"
-                  style={{ height: marketData.salaryPercentiles.boxHeight, marginBottom: marketData.salaryPercentiles.boxBottom }}
+                  style={{ height: boxHeightPct, marginBottom: boxBottomPct }}
                 >
                   {/* Median Line */}
-                  <div className="absolute w-full h-[2.5px] bg-white shadow-sm" style={{ top: marketData.salaryPercentiles.medianTop }}></div>
+                  <div className="absolute w-full h-[2.5px] bg-white shadow-sm" style={{ top: medianTopPct }}></div>
                 </div>
                 <div className="absolute -bottom-6 text-[10px] font-bold text-on-surface text-center whitespace-nowrap">
                   {role} Range

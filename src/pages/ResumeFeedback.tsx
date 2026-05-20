@@ -2,30 +2,22 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CircularProgress from '../components/ui/CircularProgress';
 import { DynamicResumeFeedback } from '../utils/aiService';
-import { getProfile } from '../utils/supabaseClient';
+import { useProfile } from '../context/ProfileContext';
 
 export default function ResumeFeedback() {
   const navigate = useNavigate();
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const { profile, loading } = useProfile();
   const [analysis, setAnalysis] = useState<DynamicResumeFeedback | null>(null);
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const data = await getProfile();
-        if (data && data.resume_analysis) {
-          setAnalysis(data.resume_analysis);
-        }
-      } catch (e) {
-        console.error("Failed to load resume analysis from Supabase:", e);
-      } finally {
-        setLoadingProfile(false);
-      }
+    if (profile && profile.resume_analysis) {
+      setAnalysis(profile.resume_analysis);
+    } else {
+      setAnalysis(null);
     }
-    loadData();
-  }, []);
+  }, [profile]);
 
-  if (loadingProfile) {
+  if (loading) {
     return (
       <div className="min-h-[400px] flex items-center justify-center animate-pulse">
         <div className="text-center space-y-4">

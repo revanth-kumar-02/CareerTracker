@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { getProfile, SupabaseProfile } from '../../utils/supabaseClient';
+import { useProfile } from '../../context/ProfileContext';
+import { supabase } from '../../utils/supabaseClient';
 
 const navItems = [
   { to: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
@@ -14,32 +15,18 @@ const navItems = [
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<SupabaseProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { profile, loading } = useProfile();
 
-  const fetchProfile = async () => {
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.preventDefault();
     try {
-      const data = await getProfile();
-      setProfile(data);
-    } catch (e) {
-      console.error("Failed to load profile in layout:", e);
-    } finally {
-      setLoading(false);
+      await supabase.auth.signOut();
+      navigate('/');
+    } catch (err) {
+      console.error("Failed to sign out from Supabase session:", err);
+      navigate('/');
     }
   };
-
-  useEffect(() => {
-    fetchProfile();
-
-    // Listen for custom events to refresh layout state dynamically
-    const handleProfileUpdate = () => {
-      fetchProfile();
-    };
-    window.addEventListener('profile-updated', handleProfileUpdate);
-    return () => {
-      window.removeEventListener('profile-updated', handleProfileUpdate);
-    };
-  }, []);
 
   const isActive = (path: string) => {
     if (path === '/roadmap') {
@@ -60,6 +47,17 @@ export default function DashboardLayout() {
     return location.pathname === path;
   };
 
+  if (loading && !profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto"></div>
+          <p className="text-xs text-on-surface-variant font-bold">Synchronizing AI Career Vector...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background text-on-background flex flex-col md:block antialiased relative">
       {/* Mobile Top Nav */}
@@ -78,7 +76,7 @@ export default function DashboardLayout() {
             <span className="material-symbols-outlined">settings</span>
           </button>
           <div className="w-8 h-8 rounded-full bg-surface-container-highest border-2 border-surface-container flex items-center justify-center text-xs font-bold text-primary">
-            A
+            {profile?.name?.charAt(0).toUpperCase() || 'A'}
           </div>
         </div>
       </nav>
@@ -161,14 +159,14 @@ export default function DashboardLayout() {
           </div>
 
           <div className="flex flex-col gap-1 pt-2 border-t border-surface-container-highest">
-            <a href="#" className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg text-[13px] font-medium hover:text-primary transition-all duration-200">
+            <a href="mailto:support@careertrack.ai?subject=CareerTrack AI Support Query" className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg text-[13px] font-medium hover:text-primary transition-all duration-200">
               <span className="material-symbols-outlined">help</span>
               Support
             </a>
-            <a href="/" className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-error-container hover:text-error rounded-lg text-[13px] font-medium transition-all duration-200">
+            <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-error-container hover:text-error rounded-lg text-[13px] font-medium transition-all duration-200 w-full text-left cursor-pointer">
               <span className="material-symbols-outlined">logout</span>
               Logout
-            </a>
+            </button>
           </div>
         </div>
       </aside>
@@ -198,3 +196,4 @@ export default function DashboardLayout() {
     </div>
   );
 }
+

@@ -1,33 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DynamicRoadmap } from '../utils/aiService';
-import { getProfile, SupabaseProfile } from '../utils/supabaseClient';
+import { useProfile } from '../context/ProfileContext';
 
 export default function CareerRoadmap() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<SupabaseProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [roadmap, setRoadmap] = useState<DynamicRoadmap | null>(null);
+  const { profile, loading } = useProfile();
+  const roadmap = profile?.roadmap as DynamicRoadmap | null;
 
-  const fetchProfileData = async () => {
-    try {
-      const data = await getProfile();
-      setProfile(data);
-      if (data && data.roadmap) {
-        setRoadmap(data.roadmap);
-      }
-    } catch (e) {
-      console.error("Failed to load profile in roadmap page:", e);
-    } finally {
-      setLoadingProfile(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProfileData();
-  }, []);
-
-  if (loadingProfile) {
+  if (loading) {
     return (
       <div className="min-h-[400px] flex items-center justify-center animate-pulse">
         <div className="text-center space-y-4">
@@ -39,7 +20,40 @@ export default function CareerRoadmap() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
+    <div className="space-y-8 animate-fade-in pb-16 relative">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          aside, nav, .no-print, header .flex.gap-3, button, a {
+            display: none !important;
+          }
+          main {
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: 100% !important;
+            width: 100% !important;
+          }
+          body, html {
+            background: #ffffff !important;
+            color: #000000 !important;
+          }
+          .bg-surface-container-lowest, .bg-surface-container-low, .bg-surface-container {
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #000000 !important;
+          }
+          .shadow-level-2, .shadow-premium, .shadow-sm, .shadow-md {
+            box-shadow: none !important;
+          }
+          .grid {
+            display: grid !important;
+            grid-template-columns: 1fr !important;
+            gap: 1.5rem !important;
+          }
+          .roadmap-item {
+            page-break-inside: avoid;
+          }
+        }
+      `}} />
       {roadmap ? (
         <>
           {/* Header Section */}
@@ -69,7 +83,10 @@ export default function CareerRoadmap() {
                 <span className="material-symbols-outlined text-base font-bold">auto_awesome</span>
                 Regenerate Path
               </button>
-              <button className="flex-1 lg:flex-none px-6 py-3 bg-surface-container-lowest text-on-surface border border-outline-variant/30 rounded-lg text-xs font-semibold hover:bg-surface-container-low transition-colors flex items-center justify-center gap-1.5 shadow-sm">
+              <button 
+                onClick={() => window.print()}
+                className="flex-1 lg:flex-none px-6 py-3 bg-surface-container-lowest text-on-surface border border-outline-variant/30 rounded-lg text-xs font-semibold hover:bg-surface-container-low transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              >
                 <span className="material-symbols-outlined text-base">download</span>
                 Export PDF
               </button>

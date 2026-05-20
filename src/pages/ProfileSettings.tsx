@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getProfile, upsertProfile, SupabaseProfile } from '../utils/supabaseClient';
+import { useProfile } from '../context/ProfileContext';
 import { AVAILABLE_ROLES } from '../data/mockData';
 
 export default function ProfileSettings() {
-  const [profile, setProfile] = useState<SupabaseProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { profile, loading, updateProfile } = useProfile();
   const [saving, setSaving] = useState(false);
 
   // Forms state
@@ -13,26 +12,13 @@ export default function ProfileSettings() {
   const [briefing, setBriefing] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const fetchProfile = async () => {
-    setLoading(true);
-    try {
-      const data = await getProfile();
-      setProfile(data);
-      if (data) {
-        setName(data.name || '');
-        setTargetRole(data.target_role || AVAILABLE_ROLES[0]);
-        setBriefing(data.briefing || '');
-      }
-    } catch (e) {
-      console.error("Failed to load profile in settings:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (profile) {
+      setName(profile.name || '');
+      setTargetRole(profile.target_role || AVAILABLE_ROLES[0]);
+      setBriefing(profile.briefing || '');
+    }
+  }, [profile]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,14 +43,13 @@ export default function ProfileSettings() {
         extraXp = computedXp;
       }
 
-      const updated = await upsertProfile({
+      await updateProfile({
         name: name.trim(),
         target_role: targetRole,
         briefing: finalBriefing,
         xp: extraXp > 0 ? extraXp : (profile?.xp || 100)
       });
 
-      setProfile(updated);
       setSaveSuccess(true);
       
       // Dispatch custom event to notify Layout sidebar
