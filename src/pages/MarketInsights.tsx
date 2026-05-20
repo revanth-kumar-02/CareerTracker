@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateMarketInsights, DynamicMarketData } from '../utils/aiService';
 import { trendingRoles } from '../data/mockData';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../context/ProfileContext';
 
 export default function MarketInsights() {
