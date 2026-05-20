@@ -116,48 +116,6 @@ export default function DashboardLayout() {
 
         {/* Bottom */}
         <div className="mt-auto flex flex-col gap-4 pt-4">
-          {/* AI Career Streak & Recommendation Widget */}
-          <div className="bg-gradient-to-br from-primary/5 to-secondary/5 border border-primary/10 rounded-xl p-4 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full blur-2xl pointer-events-none group-hover:bg-secondary/10 transition-colors duration-500"></div>
-            
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-secondary font-bold text-[18px] fill animate-pulse">auto_awesome</span>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-secondary">AI Recommendation</span>
-              </div>
-              <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Hot</span>
-            </div>
-
-            <h4 className="text-xs font-bold text-on-surface mb-1">Growth Catalyst</h4>
-            <p className="text-[11px] text-on-surface-variant leading-relaxed mb-3">
-              AI predicts a <span className="font-semibold text-primary">28% surge</span> in <span className="font-semibold text-primary">{profile?.target_role || 'Cloud + AI orchestration'}</span> roles this upcoming hiring cycle.
-            </p>
-
-            <div className="pt-3 border-t border-primary/10 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm">🔥</span>
-                <div>
-                  <p className="text-[11px] font-extrabold text-on-surface leading-none">{profile?.streak || 0}-Day Streak</p>
-                  <p className="text-[8px] text-on-surface-variant font-medium mt-0.5">
-                    {profile?.streak && profile.streak > 0 ? 'Top 5% Student' : 'Start your streak!'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5, 6, 7].map((day) => {
-                  const isCompleted = profile?.streak ? day <= profile.streak : false;
-                  return (
-                    <div 
-                      key={day} 
-                      className={`w-1.5 h-1.5 rounded-full ${isCompleted ? 'bg-primary' : 'bg-primary/20 animate-pulse'}`}
-                      title={isCompleted ? 'Completed' : 'Upcoming'}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
           <div className="flex flex-col gap-1 pt-2 border-t border-surface-container-highest">
             <a href="mailto:support@careertrack.ai?subject=CareerTrack AI Support Query" className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg text-[13px] font-medium hover:text-primary transition-all duration-200">
               <span className="material-symbols-outlined">help</span>

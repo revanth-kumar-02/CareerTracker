@@ -24,7 +24,7 @@ export default function InterviewPrep() {
       if (profile.target_role) {
         setTargetRole(profile.target_role);
       }
-      if (profile.interview_session) {
+      if (profile.interview_session && typeof profile.interview_session.avgConfidence === 'number') {
         setPrevSession(profile.interview_session);
       } else {
         setPrevSession(null);
@@ -146,7 +146,7 @@ export default function InterviewPrep() {
                 <div className="space-y-3 pt-4 border-t border-surface-container-high">
                   <p className="text-xs font-bold text-on-surface">Key AI Coaching Recommendations:</p>
                   <ul className="space-y-2">
-                    {prevSession.coachingTips.slice(0, 2).map((tip, i) => (
+                    {(prevSession.coachingTips || []).slice(0, 2).map((tip, i) => (
                       <li key={i} className="flex gap-2 text-xs text-on-surface-variant leading-relaxed">
                         <span className="material-symbols-outlined text-primary text-sm shrink-0 mt-0.5">tips_and_updates</span>
                         <span className="font-medium">{tip}</span>

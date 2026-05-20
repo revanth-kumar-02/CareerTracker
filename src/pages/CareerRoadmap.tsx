@@ -6,7 +6,9 @@ import { useProfile } from '../context/ProfileContext';
 export default function CareerRoadmap() {
   const navigate = useNavigate();
   const { profile, loading } = useProfile();
-  const roadmap = profile?.roadmap as DynamicRoadmap | null;
+  const raw = profile?.roadmap as DynamicRoadmap | null;
+  // Only treat as valid roadmap if it has the required stages array
+  const roadmap = (raw && Array.isArray(raw.stages) && raw.stages.length > 0) ? raw : null;
 
   if (loading) {
     return (
@@ -134,7 +136,7 @@ export default function CareerRoadmap() {
                             {stage.desc}
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            {stage.skills.map((skill) => (
+                            {(stage.skills || []).map((skill) => (
                               <span key={skill} className="px-2.5 py-1 bg-surface-container-low text-on-surface-variant rounded text-[10px] font-semibold border border-outline-variant/20">
                                 {skill}
                               </span>
@@ -175,7 +177,7 @@ export default function CareerRoadmap() {
                             {stage.desc}
                           </p>
                           <div className="flex flex-col gap-2.5 mb-4 relative z-10">
-                            {stage.subtasks?.map((subtask) => (
+                            {(stage.subtasks || []).map((subtask) => (
                               <div key={subtask.name} className={`flex items-center justify-between p-3 rounded-lg border ${subtask.status === 'In Progress' ? 'bg-surface-container-low border-primary/10' : 'bg-surface-container-lowest border-outline-variant/20 hover:border-primary/50 transition-colors cursor-pointer'}`}>
                                 <div className="flex items-center gap-2.5">
                                   <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${subtask.status === 'In Progress' ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'}`}>
@@ -227,7 +229,7 @@ export default function CareerRoadmap() {
                           {stage.desc}
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {stage.skills.map((skill) => (
+                          {(stage.skills || []).map((skill) => (
                             <span key={skill} className="px-2.5 py-1 bg-surface-container-lowest text-outline rounded text-[10px] font-semibold border border-outline-variant/20 flex items-center gap-1">
                               <span className="material-symbols-outlined text-[13px]">lock_clock</span>
                               {skill}
@@ -277,7 +279,7 @@ export default function CareerRoadmap() {
                   Skill Gap Analysis
                 </h3>
                 <div className="space-y-4">
-                  {roadmap.skillGaps.map((gap) => (
+                  {(roadmap.skillGaps || []).map((gap) => (
                     <div key={gap.name}>
                       <div className="flex justify-between text-xs mb-1.5">
                         <span className="text-on-surface font-semibold">{gap.name}</span>

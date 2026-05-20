@@ -10,7 +10,7 @@ export default function ResumeFeedback() {
   const [analysis, setAnalysis] = useState<DynamicResumeFeedback | null>(null);
 
   useEffect(() => {
-    if (profile && profile.resume_analysis) {
+    if (profile && profile.resume_analysis && typeof profile.resume_analysis.atsScore === 'number') {
       setAnalysis(profile.resume_analysis);
     } else {
       setAnalysis(null);
@@ -108,11 +108,11 @@ export default function ResumeFeedback() {
               Priority Fixes
             </h3>
             <span className="px-2.5 py-1 bg-error/10 text-error rounded text-[10px] font-bold">
-              {analysis.priorityFixes.length} High Impact
+              {(analysis.priorityFixes || []).length} High Impact
             </span>
           </div>
           <ul className="flex flex-col gap-3">
-            {analysis.priorityFixes.map((fix, idx) => (
+            {(analysis.priorityFixes || []).map((fix, idx) => (
               <li key={idx} className="flex items-start gap-4 p-3 bg-surface-container-low hover:bg-surface-container transition-all duration-200 rounded-lg group cursor-pointer border border-outline-variant/10">
                 <div className={`w-8 h-8 rounded-full ${fix.bgClass} ${fix.colorClass} flex items-center justify-center shrink-0 mt-0.5`}>
                   <span className="material-symbols-outlined text-sm">{fix.icon}</span>
@@ -141,7 +141,7 @@ export default function ResumeFeedback() {
             ATS Compatibility Filters
           </h3>
           <div className="space-y-3">
-            {analysis.atsChecklist.map((item) => (
+            {(analysis.atsChecklist || []).map((item) => (
               <div key={item.label} className="flex items-center justify-between border-b border-surface-container-high pb-3">
                 <div className="flex items-center gap-3">
                   <span className={`material-symbols-outlined ${item.status === 'Pass' ? 'text-primary' : 'text-error'} fill text-lg`}>
@@ -172,7 +172,7 @@ export default function ResumeFeedback() {
             <div>
               <p className="text-xs font-bold text-on-surface mb-2">Matched Competencies</p>
               <div className="flex flex-wrap gap-2">
-                {analysis.matchedSkills.map((skill) => (
+                {(analysis.matchedSkills || []).map((skill) => (
                   <span key={skill} className="px-2.5 py-1 bg-surface-container-low text-on-surface rounded-full text-[10px] font-bold border border-outline-variant/30">
                     {skill}
                   </span>
@@ -182,7 +182,7 @@ export default function ResumeFeedback() {
             <div>
               <p className="text-xs font-bold text-on-surface mb-2">Missing Priority Skills</p>
               <div className="flex flex-wrap gap-2">
-                {analysis.missingSkills.map((skill) => (
+                {(analysis.missingSkills || []).map((skill) => (
                   <span key={skill} className="px-2.5 py-1 bg-error/5 text-error rounded-full text-[10px] font-bold border border-error/20 flex items-center gap-1">
                     <span className="material-symbols-outlined text-xs">add</span> {skill}
                   </span>
@@ -202,7 +202,7 @@ export default function ResumeFeedback() {
             <span className="text-xs text-on-surface-variant font-bold">Based on Google's X-Y-Z Achievement Standard</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {analysis.googleFormulaAnalysis.map((item, idx) => (
+            {(analysis.googleFormulaAnalysis || []).map((item, idx) => (
               <div key={idx} className={`p-4 bg-surface-container-low rounded-xl border-l-4 ${item.type === 'strong' ? 'border-primary' : 'border-error'} flex flex-col justify-between gap-4 hover:shadow-sm transition-all duration-300`}>
                 <div>
                   <p className={`text-xs font-bold ${item.type === 'strong' ? 'text-primary' : 'text-error'} mb-2 flex items-center gap-1`}>

@@ -18,7 +18,7 @@ export default function ResumeLab() {
       if (profile.target_role) {
         setTargetRole(profile.target_role);
       }
-      if (profile.resume_analysis) {
+      if (profile.resume_analysis && typeof profile.resume_analysis.atsScore === 'number') {
         setAnalysis(profile.resume_analysis);
         setUploadState('results');
       } else {
@@ -205,7 +205,7 @@ export default function ResumeLab() {
               <div className="h-3 bg-outline-variant/20 rounded w-full"></div>
               <div className="h-3 bg-outline-variant/20 rounded w-3/4 mb-4"></div>
 
-              {analysis.priorityFixes.slice(0, 1).map((fix, idx) => (
+              {(analysis.priorityFixes || []).slice(0, 1).map((fix, idx) => (
                 <div key={idx} className="p-3 bg-error/5 border-l-4 border-error rounded-r-lg space-y-1.5 font-sans">
                   <div className="font-semibold text-error flex items-center gap-1 text-[11px]">
                     <span className="material-symbols-outlined text-sm font-bold">warning</span>
@@ -266,7 +266,7 @@ export default function ResumeLab() {
                 Core Actionable Suggestions
               </h4>
               <div className="space-y-4">
-                {analysis.actionableSuggestions.map((suggestion, index) => (
+                {(analysis.actionableSuggestions || []).map((suggestion, index) => (
                   <div key={index} className="flex gap-4 p-4 rounded-xl bg-surface-container-low border border-surface-container hover:border-primary/40 hover:-translate-y-0.5 transition-all duration-300">
                     <div className="mt-0.5 shrink-0">
                       <span className={`material-symbols-outlined ${suggestion.type === 'warning' ? 'text-error' : 'text-primary'}`}>
