@@ -8,7 +8,11 @@ interface ProfileContextType {
   updateProfile: (updates: Partial<SupabaseProfile>) => Promise<SupabaseProfile | null>;
 }
 
-const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
+// Support global singleton in development/HMR to prevent duplicate module context mismatch on Windows casing issues
+const ProfileContext = (globalThis as any).__careertrack_profile_context || createContext<ProfileContextType | undefined>(undefined);
+if (typeof window !== 'undefined') {
+  (window as any).__careertrack_profile_context = ProfileContext;
+}
 
 export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<SupabaseProfile | null>(null);

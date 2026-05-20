@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import CircularProgress from '../components/ui/CircularProgress';
-import { companies, AVAILABLE_ROLES } from '../data/mockData';
+import { companies, AVAILABLE_ROLES, trendingRoles } from '../data/staticContent';
 import { useProfile } from '../context/ProfileContext';
 
 export default function Dashboard() {
@@ -27,7 +27,7 @@ export default function Dashboard() {
       await updateProfile({
         name: editName.trim(),
         target_role: editRole.trim(),
-        briefing: `Dynamic intelligence briefing active for your path to become a ${editRole.trim()}. High-demand competencies like System Architecture are surging +34% in regional hubs.`
+        briefing: `Dynamic learning trajectory active for your path to become a ${editRole.trim()}. Your roadmap and interview prep workspaces are ready.`
       });
     } catch (e) {
       console.error("Failed to save onboarding profile:", e);
@@ -120,29 +120,75 @@ export default function Dashboard() {
   let roadmapPercentage = 0;
   let roadmapSkills: { name: string; width: string; completed: boolean; inProgress: boolean }[] = [];
 
-  if (profile.roadmap && profile.roadmap.stages) {
-    try {
-      let completed = 0;
-      let total = 0;
-      profile.roadmap.stages.forEach((stage: any) => {
-        if (stage.status === 'Completed') completed += 1;
-        total += 1;
-        if (stage.subtasks) {
-          stage.subtasks.forEach((sub: any) => {
-            if (sub.status === 'Completed') completed += 1;
-            total += 1;
-          });
-        }
-      });
-      roadmapPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const matchingRole = profile?.target_role
+    ? (trendingRoles.find(r => r.title.toLowerCase() === profile.target_role.toLowerCase()) || {
+        hiringTrend: 'Accelerating',
+        demandPercentage: 84
+      })
+    : { hiringTrend: 'Accelerating', demandPercentage: 84 };
 
-      if (profile.roadmap.skillGaps) {
-        roadmapSkills = profile.roadmap.skillGaps.map((gap: any, idx: number) => ({
-          name: gap.name,
-          width: gap.progressWidth === '3/5' ? '60%' : gap.progressWidth === '2/5' ? '40%' : gap.progressWidth === '4/5' ? '80%' : '100%',
-          completed: idx === 2,
-          inProgress: idx === 0
+  if (profile.roadmap) {
+    try {
+      if (profile.roadmap.phases && profile.roadmap.phases.length > 0) {
+        // New phase-based syllabus system
+        let completedTasks = 0;
+        let totalTasks = 0;
+        const skillSet: string[] = [];
+        profile.roadmap.phases.forEach((phase: any) => {
+          if (phase.days) {
+            phase.days.forEach((day: any) => {
+              totalTasks += 1;
+              if (day.status === 'Completed') completedTasks += 1;
+            });
+          }
+          if (phase.finalProject) {
+            totalTasks += 1;
+            if (phase.finalProject.status === 'Completed') completedTasks += 1;
+          }
+          if (phase.unlockedSkills) skillSet.push(...phase.unlockedSkills);
+        });
+        roadmapPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+        roadmapSkills = skillSet.slice(0, 3).map((skill: string, idx: number) => ({
+          name: skill,
+          width: idx < completedTasks ? '100%' : '35%',
+          completed: idx < completedTasks,
+          inProgress: idx === completedTasks
         }));
+      } else if (profile.roadmap.skillNodes) {
+        const completedNodes = profile.roadmap.skillNodes.filter((n: any) => n.status === 'Completed').length;
+        const totalNodes = profile.roadmap.skillNodes.length;
+        roadmapPercentage = totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0;
+
+        roadmapSkills = profile.roadmap.skillNodes.slice(0, 3).map((node: any, idx: number) => ({
+          name: node.label,
+          width: node.status === 'Completed' ? '100%' : node.status === 'In Progress' ? '50%' : '15%',
+          completed: node.status === 'Completed',
+          inProgress: node.status === 'In Progress'
+        }));
+      } else if (profile.roadmap.stages) {
+        let completed = 0;
+        let total = 0;
+        profile.roadmap.stages.forEach((stage: any) => {
+          if (stage.status === 'Completed') completed += 1;
+          total += 1;
+          if (stage.subtasks) {
+            stage.subtasks.forEach((sub: any) => {
+              if (sub.status === 'Completed') completed += 1;
+              total += 1;
+            });
+          }
+        });
+        roadmapPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        if (profile.roadmap.skillGaps) {
+          roadmapSkills = profile.roadmap.skillGaps.map((gap: any, idx: number) => ({
+            name: gap.name,
+            width: gap.progressWidth === '3/5' ? '60%' : gap.progressWidth === '2/5' ? '40%' : gap.progressWidth === '4/5' ? '80%' : '100%',
+            completed: idx === 2,
+            inProgress: idx === 0
+          }));
+        }
       }
     } catch (e) {
       console.error("Failed to parse roadmap progress:", e);
@@ -153,58 +199,28 @@ export default function Dashboard() {
   const atsScore = profile.resume_analysis?.atsScore ?? null;
 
   // Parse interview preparedness index
-  const interviewScore = profile.interview_session?.confidenceIndex 
-    ? parseFloat((profile.interview_session.confidenceIndex / 10).toFixed(1))
+  const interviewScore = profile.interview_session?.avgConfidence 
+    ? parseFloat((profile.interview_session.avgConfidence / 10).toFixed(1))
     : null;
 
   return (
     <div className="space-y-10 animate-fade-in pb-16">
       
-      {/* Header Section with AI Pulse */}
+      {/* Header Section with Active Path Summary */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-6 border-b border-surface-container-highest">
         <div className="flex-1 w-full">
           <div className="flex items-center gap-2 mb-2">
             <span className="px-2.5 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-bold tracking-wider uppercase flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
-              Live AI Intelligence Feed
+              Active Learning Path Summary
             </span>
           </div>
 
-          <div className="group relative">
-            <h1 className="text-3xl md:text-[44px] font-extrabold leading-tight tracking-tight text-on-surface mb-2 flex items-center gap-2">
+          <div>
+            <h1 className="text-3xl md:text-[44px] font-extrabold leading-tight tracking-tight text-on-surface mb-2">
               Welcome back, {profile.name}
-              <Link
-                to="/profile"
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-all text-xs flex items-center gap-1 font-bold shrink-0 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-sm font-bold">settings</span>
-                Edit Profile
-              </Link>
             </h1>
             <p className="text-base text-on-surface-variant max-w-2xl">{profile.briefing}</p>
-          </div>
-        </div>
-
-
-        {/* Global Stats Widget */}
-        <div className="flex gap-4 w-full md:w-auto shrink-0">
-          <div className="flex-1 md:flex-none px-4 py-3 bg-surface-container-lowest border border-surface-container rounded-xl shadow-premium flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
-              <span className="material-symbols-outlined font-bold">trending_up</span>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold text-on-surface-variant tracking-wider">Market Speed</p>
-              <p className="text-base font-extrabold text-primary">Accelerating</p>
-            </div>
-          </div>
-          <div className="flex-1 md:flex-none px-4 py-3 bg-surface-container-lowest border border-surface-container rounded-xl shadow-premium flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-secondary/5 flex items-center justify-center text-secondary">
-              <span className="material-symbols-outlined font-bold">query_stats</span>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold text-on-surface-variant tracking-wider">Hiring Index</p>
-              <p className="text-base font-extrabold text-secondary">8.4 / 10</p>
-            </div>
           </div>
         </div>
       </header>
@@ -221,15 +237,15 @@ export default function Dashboard() {
             <p className="text-xs text-on-surface-variant">Real-time pathway integrations across global and Indian tech giants</p>
           </div>
           <span className="text-[10px] font-bold text-primary bg-primary/5 border border-primary/20 px-2.5 py-1 rounded-full shrink-0">
-            33 Active Ecosystem Partners
+            {companies.length} Active Ecosystem Partners
           </span>
         </div>
 
         {/* Dual Marquees */}
         <div className="relative overflow-hidden marquee-container select-none -mx-6 pt-2">
-          {/* Subtle edge fades */}
-          <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+          {/* Theme-aware edge fades */}
+          <div className="marquee-fade-left" />
+          <div className="marquee-fade-right" />
           
           <div className="flex flex-col gap-4">
             {/* Top row - left moving */}
@@ -238,10 +254,10 @@ export default function Dashboard() {
                 {[...companies.slice(0, 16), ...companies.slice(0, 16)].map((company, idx) => (
                   <div
                     key={`dash-c1-${company}-${idx}`}
-                    className="px-5 py-3 rounded-xl border border-surface-container text-on-surface font-semibold text-xs cursor-pointer shrink-0 premium-glass"
+                    className="px-5 py-3 rounded-xl border border-surface-container text-on-surface font-semibold text-xs cursor-pointer shrink-0 premium-glass transition-all duration-300 hover:scale-105 hover:shadow-md hover:border-primary/20 group/company"
                   >
                     <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary/30"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover/company:bg-emerald-500 group-hover/company:shadow-[0_0_8px_rgba(16,185,129,0.7)] group-hover/company:scale-125 transition-all duration-350"></span>
                       {company}
                     </span>
                   </div>
@@ -255,10 +271,10 @@ export default function Dashboard() {
                 {[...companies.slice(16), ...companies.slice(16)].map((company, idx) => (
                   <div
                     key={`dash-c2-${company}-${idx}`}
-                    className="px-5 py-3 rounded-xl border border-surface-container text-on-surface font-semibold text-xs cursor-pointer shrink-0 premium-glass"
+                    className="px-5 py-3 rounded-xl border border-surface-container text-on-surface font-semibold text-xs cursor-pointer shrink-0 premium-glass transition-all duration-300 hover:scale-105 hover:shadow-md hover:border-primary/20 group/company"
                   >
                     <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-secondary/30"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover/company:bg-emerald-500 group-hover/company:shadow-[0_0_8px_rgba(16,185,129,0.7)] group-hover/company:scale-125 transition-all duration-350"></span>
                       {company}
                     </span>
                   </div>

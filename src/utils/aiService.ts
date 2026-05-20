@@ -104,38 +104,138 @@ async function callGroqJSON<T>(prompt: string, fallbackData: T): Promise<T> {
 // Interfaces (Aligning with App Pages)
 // ----------------------------------------------------
 
+export interface SkillNode {
+  id: string;
+  label: string;
+  desc: string;
+  status: 'Completed' | 'In Progress' | 'Locked';
+  dependencies: string[]; // parent node IDs
+  category: string; // e.g. "Core Skills", "Advanced Skills", "Specialized Skills"
+}
+
+export interface CareerAction {
+  id: string;
+  title: string;
+  desc: string;
+  hiringImpact: 'High' | 'Critical' | 'Medium';
+  skillBoost: string; // e.g. "+15%"
+  completionTime: string; // e.g. "4h", "2 days"
+  marketRelevance: string; // e.g. "Top Priority"
+  companyAlignmentGain: string; // e.g. "Figma +10%"
+  status: 'Pending' | 'Completed';
+}
+
+export interface CompanyMatch {
+  companyName: string;
+  matchPercentage: number;
+  missingSkills: string[];
+  portfolioGaps: string[];
+  interviewWeaknesses: string[];
+  atsMismatch: string[];
+}
+
+export interface SalaryTrendPoint {
+  year: string;
+  salary: number;
+}
+
+export interface RegionalHiringPoint {
+  region: string;
+  demand: number;
+}
+
+export interface MarketMetrics {
+  marketDemand: string; // e.g. "+31%"
+  salaryRange: string; // e.g. "₹18L–₹42L"
+  growthTrend: string; // e.g. "Rapid Growth"
+  hiringMomentum: string; // e.g. "Accelerating"
+  topHiringCompanies: string[]; // e.g. ["Google", "Adobe", "Figma", "Swiggy"]
+  aiConfidenceScore: number; // e.g. 92
+  fastestGrowingSkills: string[];
+  remoteWorkDemand: string; // e.g. "65%"
+  aiImpact: string; // e.g. "Augmented"
+  competitionLevel: string; // e.g. "Moderate"
+  salaryTrendPoints: SalaryTrendPoint[];
+  regionalHiring: RegionalHiringPoint[];
+}
+
+export interface ConceptDetails {
+  whatIsThis: string;
+  whyItMatters: string;
+  whereIsUsed: string;
+  simpleExample: string;
+  miniVisualization?: string; // e.g. text flowchart or short code block
+  relatedConcepts: string[]; // e.g. ["Props", "State", "JSX"]
+  quickPractice: string;
+  analogy: string;
+}
+
+export interface DayLearnTask {
+  id: string;
+  dayNumber: number;
+  title: string;
+  description: string;
+  type: 'LEARN' | 'PRACTICE';
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  timeEstimate: string;
+  xpReward: number;
+  status: 'Locked' | 'Available' | 'Completed';
+  concept?: ConceptDetails; // provided only if type is 'LEARN'
+}
+
+export interface CheckpointQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: string;
+}
+
+export interface MiniCheckpoint {
+  title: string;
+  questions: CheckpointQuestion[];
+  confidenceSkills: string[];
+  passed: boolean;
+}
+
+export interface PhaseProject {
+  title: string;
+  description: string;
+  timeEstimate: string;
+  xpReward: number;
+  portfolioValue: string;
+  hiringImpact: 'High' | 'Medium' | 'Critical';
+  status: 'Locked' | 'Available' | 'Completed';
+}
+
+export interface Phase {
+  id: string;
+  title: string;
+  focus: string;
+  duration: string;
+  completionPercentage: number;
+  xpReward: number;
+  unlockedSkills: string[];
+  days: DayLearnTask[];
+  checkpoint: MiniCheckpoint;
+  finalProject: PhaseProject;
+}
+
 export interface DynamicRoadmap {
   targetRole: string;
   description: string;
+  totalXP: number;
   successProbability: number;
   successReason: string;
-  stages: {
-    stage: number;
-    status: 'Completed' | 'In Progress' | 'Locked';
-    title: string;
-    timeline: string;
-    desc: string;
-    skills: string[];
-    subtasks: {
-      name: string;
-      percentage: string;
-      status: 'Completed' | 'In Progress' | 'Locked' | 'Start Next';
-    }[];
-  }[];
-  skillGaps: {
-    name: string;
-    level: string;
-    progressWidth: string; // e.g. "3/5" or "4/5"
-    colorClass: string;   // "bg-primary", "bg-secondary", "bg-tertiary-container"
-    aiSuggestion?: boolean;
-  }[];
-  recommendedNextStep: {
-    category: string;
-    title: string;
-    desc: string;
-    icon: string;
-    buttonLabel: string;
-  };
+  phases: Phase[];
+  
+  // Keep empty or minimal objects for these for backward compatibility
+  marketMetrics?: any;
+  alignment?: any;
+  skillNodes?: any[];
+  actions?: any[];
+  companyMatches?: any[];
+  stages?: any[];
+  skillGaps?: any[];
+  recommendedNextStep?: any;
 }
 
 export interface DynamicResumeFeedback {
@@ -216,108 +316,272 @@ export interface DynamicMarketData {
  * 1. Generates a custom career roadmap based on target role and optional user skills.
  */
 export async function generateRoadmap(targetRole: string, currentSkills: string = ""): Promise<DynamicRoadmap> {
+  const isUIDesigner = targetRole.toLowerCase().includes('design') || targetRole.toLowerCase().includes('ux');
+  const isAIEngineer = targetRole.toLowerCase().includes('ai') || targetRole.toLowerCase().includes('machine') || targetRole.toLowerCase().includes('ml') || targetRole.toLowerCase().includes('prompt');
+  const isCybersecurity = targetRole.toLowerCase().includes('cyber') || targetRole.toLowerCase().includes('security') || targetRole.toLowerCase().includes('hack');
+  
   const prompt = `
-    You are an expert SaaS React career intelligence coach.
-    Create a highly personalized, premium career transition roadmap for a user who wants to become a "${targetRole}".
-    ${currentSkills ? `The user currently has these skills: "${currentSkills}". Take this into account.` : ""}
+    You are an elite AI learning-system architect, educational designer, and expert career transition mentor.
+    Create a highly personalized, immersive guided learning journey for a user transitioning into a "${targetRole}".
+    ${currentSkills ? `The user currently has these skills: "${currentSkills}". Adjust the daily syllabus accordingly to focus on gaps.` : ""}
     
-    You must output a single, well-formatted JSON object that strictly adheres to the following TypeScript interface:
+    You must output a single JSON object strictly adhering to this TypeScript interface:
+
+    interface ConceptDetails {
+      whatIsThis: string;       // Simple beginner-friendly explanation (max 2 sentences)
+      whyItMatters: string;     // Real-world importance (max 2 sentences)
+      whereIsUsed: string;      // Practical applications (max 2 sentences)
+      simpleExample: string;    // Beginner code snippet or step-by-step example (formatted in markdown or clear text)
+      miniVisualization?: string; // Optional ASCII diagram, simple mental map, or concept layout
+      relatedConcepts: string[]; // 2-3 connected skills/topics
+      quickPractice: string;    // 1-sentence mini practice action to reinforce
+      analogy: string;          // A memorable real-world analogy
+    }
+
+    interface DayLearnTask {
+      id: string;               // Unique ID e.g., "p1-day1"
+      dayNumber: number;        // Day index e.g., 1, 2, 3, etc.
+      title: string;            // Simple, descriptive title (e.g. "What is Figma?", "Variables & Data Types")
+      description: string;      // Paced description of what they are learning
+      type: 'LEARN' | 'PRACTICE'; // LEARN = conceptual understanding, PRACTICE = hands-on coding exercises.
+      difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+      timeEstimate: string;     // e.g. "30 mins", "1 hour"
+      xpReward: number;         // e.g., 50 for LEARN, 100 for PRACTICE
+      status: 'Locked' | 'Available' | 'Completed'; // Phase 1 Day 1 task should be "Available". All other days "Locked".
+      concept?: ConceptDetails;  // MUST populate this block if type is 'LEARN'
+    }
+
+    interface CheckpointQuestion {
+      question: string;
+      options: string[];
+      correctAnswer: string;
+    }
+
+    interface MiniCheckpoint {
+      title: string;            // e.g. "Phase 1 Assessment"
+      questions: CheckpointQuestion[]; // 2 simple quiz questions based on the phase's daily content
+      confidenceSkills: string[]; // 3 confidence check statements (e.g., "Can you write a loop?")
+      passed: boolean;          // false
+    }
+
+    interface PhaseProject {
+      title: string;            // e.g. "Build a Basic Chatbot"
+      description: string;      // Rewarding portfolio-ready task description
+      timeEstimate: string;     // e.g. "2 days", "8 hours"
+      xpReward: number;         // e.g. 500
+      portfolioValue: string;   // How this helps their portfolio
+      hiringImpact: 'High' | 'Medium' | 'Critical';
+      status: 'Locked' | 'Available' | 'Completed'; // Start as "Locked"
+    }
+
+    interface Phase {
+      id: string;               // e.g. "phase-1"
+      title: string;            // e.g. "Phase 1: Foundation"
+      focus: string;            // e.g. "UI Fundamentals"
+      duration: string;         // e.g. "2 Weeks"
+      completionPercentage: number; // 0
+      xpReward: number;         // e.g. 1000
+      unlockedSkills: string[];  // Skills gained after completing this phase
+      days: DayLearnTask[];     // Generate 5-7 daily syllabus cards.
+      checkpoint: MiniCheckpoint;
+      finalProject: PhaseProject; // The BUILD project task at the end of the phase
+    }
+
     interface DynamicRoadmap {
       targetRole: string;
       description: string;
-      successProbability: number; // integer 0-100 representing percentage chance of success
-      successReason: string; // 1-sentence justification for the success probability
-      stages: {
-        stage: number; // 1, 2, 3
-        status: 'Completed' | 'In Progress' | 'Locked'; // stage 1 should be Completed, stage 2 In Progress, stage 3 Locked
-        title: string;
-        timeline: string; // e.g. "3 Months", "Month 4 of 6", "Future Phase"
-        desc: string; // 1-2 sentence description of what the user focuses on in this stage
-        skills: string[]; // 2-3 core skills associated with this stage
-        subtasks: {
-          name: string;
-          percentage: string; // e.g. "80%", "Start Next", "100%", "Locked"
-          status: 'Completed' | 'In Progress' | 'Locked' | 'Start Next';
-        }[]; // 2 subtasks under the stage
-      }[];
-      skillGaps: {
-        name: string;
-        level: string; // e.g. "Level 3 / 5"
-        progressWidth: string; // e.g. "3/5", "2/5", "4/5"
-        colorClass: string; // MUST be either "bg-primary", "bg-secondary", or "bg-tertiary-container"
-        aiSuggestion?: boolean; // true for at least one critical skill gap
-      }[]; // exactly 3 items representing core missing skills/topics
-      recommendedNextStep: {
-        category: string; // e.g. "Recommended Next Step" or "High Priority Course"
-        title: string; // specific learning module title
-        desc: string; // 1-sentence description of the course
-        icon: string; // Material symbols icon name e.g. "school", "terminal", "psychology"
-        buttonLabel: string; // e.g. "Start Learning Module"
-      };
+      totalXP: number;          // 0
+      successProbability: number;
+      successReason: string;
+      phases: Phase[];          // Generate exactly 3 progressive phases
     }
 
-    Keep descriptions practical, startup-grade, professional, and concise. Avoid placeholder text.
+    Ensure outputs are customized to "${targetRole}". 
+    Pacing is CRITICAL.
+    Phase 1 must contain ONLY basic learn & practice tasks. The Final Project must appear ONLY at the end of the phase as the Phase Project.
+    Only Phase 1 Day 1 task should be 'Available', all other tasks should be 'Locked'.
   `;
 
-  // Dynamic fallback generator if API fails or key is missing
+  // Fallback data structure for UI Designer, fully structured under the new guided syllabus schema.
   const fallback: DynamicRoadmap = {
     targetRole,
-    description: `Your custom-tailored vector path to transition into a elite ${targetRole}. Estimated velocity: 6-12 months.`,
-    successProbability: 82,
-    successReason: `High due to your strong foundation and modern software engineering paradigms.`,
-    stages: [
+    description: `Embark on a structured journey to become a skilled ${targetRole}, starting from core basics up to high-impact portfolio projects.`,
+    totalXP: 0,
+    successProbability: 75,
+    successReason: "Guided daily steps ensure consistent learning before project building.",
+    phases: [
       {
-        stage: 1,
-        status: 'Completed',
-        title: 'Core Fundamentals',
-        timeline: '2 Months',
-        desc: `Mastered the foundational architectures, standards, and workflow paradigms required for a ${targetRole}.`,
-        skills: ['Core Concepts', 'Toolchain Setup', 'Version Control'],
-        subtasks: [
-          { name: 'Complete Core Fundamentals Course', percentage: '100%', status: 'Completed' },
-          { name: 'Build Initial Sandbox Architecture', percentage: '100%', status: 'Completed' }
-        ]
+        id: "phase-1",
+        title: "Phase 1: Foundations of Design",
+        focus: "Visual Hierarchy, Color Theory & Figma Setup",
+        duration: "2 Weeks",
+        completionPercentage: 0,
+        xpReward: 800,
+        unlockedSkills: ["Figma Setup", "Visual Contrast"],
+        days: [
+          {
+            id: "p1-d1",
+            dayNumber: 1,
+            title: "What is Visual Hierarchy?",
+            description: "Understand spacing, contrast, and alignment to guide the user's eye naturally.",
+            type: "LEARN",
+            difficulty: "Beginner",
+            timeEstimate: "30 mins",
+            xpReward: 50,
+            status: "Available",
+            concept: {
+              whatIsThis: "Visual Hierarchy is the arrangement and presentation of design elements in order of importance.",
+              whyItMatters: "It helps users scan information quickly and complete tasks with minimal cognitive load.",
+              whereIsUsed: "Every landing page, app screen, or newsletter layout uses size and weight hierarchy.",
+              simpleExample: "An H1 title in bold 32px text followed by a small 14px body text defines visual importance.",
+              miniVisualization: "H1 Title (32px Bold) \n  └─ Subtitle (18px Regular) \n      └─ Body Text (14px Muted)",
+              relatedConcepts: ["Typography Scale", "Contrast Ratio", "White Space"],
+              quickPractice: "Open a popular site like Stripe and list the first 3 visual elements that catch your eye.",
+              analogy: "Think of a newspaper header vs. the body paragraph; the big bold title instantly tells you what's key."
+            }
+          },
+          {
+            id: "p1-d2",
+            dayNumber: 2,
+            title: "Recreate a Reusable Button",
+            description: "Implement primary and secondary button components in Figma with proper padding.",
+            type: "PRACTICE",
+            difficulty: "Beginner",
+            timeEstimate: "1 hour",
+            xpReward: 100,
+            status: "Locked"
+          },
+          {
+            id: "p1-d3",
+            dayNumber: 3,
+            title: "Color Theory & Contrast ratios",
+            description: "Learn how to select accessible colors that align with WCAG AA/AAA guidelines.",
+            type: "LEARN",
+            difficulty: "Beginner",
+            timeEstimate: "45 mins",
+            xpReward: 50,
+            status: "Locked",
+            concept: {
+              whatIsThis: "Color Theory is the rules and guidelines designers use to communicate with users through appealing color schemes.",
+              whyItMatters: "Using correct contrast ensures accessibility for colorblind or visually impaired users.",
+              whereIsUsed: "Buttons, text layers, and alert statuses (red/green) must meet accessibility guidelines.",
+              simpleExample: "Black text on a white background has a 21:1 contrast ratio, which is highly readable.",
+              miniVisualization: "🟢 High Contrast (Web Content Accessibility compliant) vs. 🔴 Low Gray-on-Light-Gray Contrast",
+              relatedConcepts: ["WCAG Guidelines", "Color Harmonies", "Muted Palettes"],
+              quickPractice: "Use an online contrast checker to test if a light yellow button with white text is readable.",
+              analogy: "A high-visibility safety vest is bright orange with silver stripes so it stands out against dark roads."
+            }
+          }
+        ],
+        checkpoint: {
+          title: "Phase 1 Checkpoint",
+          questions: [
+            {
+              question: "Which contrast ratio is generally recommended for body text under WCAG AA standards?",
+              options: ["At least 4.5:1", "Exactly 1:1", "Around 2:1", "At least 15:1"],
+              correctAnswer: "At least 4.5:1"
+            },
+            {
+              question: "What is the primary purpose of visual hierarchy in UI design?",
+              options: ["To make interfaces load faster", "To guide the user's focus in order of importance", "To use as many colors as possible", "To replace all text with icons"],
+              correctAnswer: "To guide the user's focus in order of importance"
+            }
+          ],
+          confidenceSkills: [
+            "I understand contrast ratios and can spot poor accessibility.",
+            "I can create buttons with appropriate visual hierarchy."
+          ],
+          passed: false
+        },
+        finalProject: {
+          title: "Design a Landing Page Hero Section",
+          description: "Build a responsive hero section in Figma including typography scale, primary call-to-action button, and accessible visual hierarchy.",
+          timeEstimate: "4 hours",
+          xpReward: 400,
+          portfolioValue: "High - Demonstrates layout, alignment, color accessibility and hierarchy basics.",
+          hiringImpact: "High",
+          status: "Locked"
+        }
       },
       {
-        stage: 2,
-        status: 'In Progress',
-        title: 'Specialized Applications',
-        timeline: 'Month 2 of 4',
-        desc: `Deep diving into highly-requested systems design patterns, specialized framework layers, and scalable engineering.`,
-        skills: ['Scaling Patterns', 'Advanced Integrations'],
-        subtasks: [
-          { name: 'Implement Advanced Optimization Patterns', percentage: '60%', status: 'In Progress' },
-          { name: 'Construct Orchestrated Automation Pipelines', percentage: 'Start Next', status: 'Start Next' }
-        ]
-      },
-      {
-        stage: 3,
-        status: 'Locked',
-        title: 'Scale & Operations',
-        timeline: 'Future Phase',
-        desc: `Developing strategic high-availability designs, organizational team leadership, and fault-tolerant architecture standards.`,
-        skills: ['Fault-Tolerance', 'System Audit & Refinement'],
-        subtasks: [
-          { name: 'Perform Full Scale Stress Test Audit', percentage: 'Locked', status: 'Locked' },
-          { name: 'Architect Distributed Cluster Systems', percentage: 'Locked', status: 'Locked' }
-        ]
+        id: "phase-2",
+        title: "Phase 2: Interaction Design & Prototyping",
+        focus: "Figma Auto-Layout, Components & Micro-animations",
+        duration: "2 Weeks",
+        completionPercentage: 0,
+        xpReward: 1000,
+        unlockedSkills: ["Auto-Layout", "Components"],
+        days: [
+          {
+            id: "p2-d1",
+            dayNumber: 1,
+            title: "Figma Auto-Layout Basics",
+            description: "Learn how to build designs that stretch and resize automatically using Auto-Layout frames.",
+            type: "LEARN",
+            difficulty: "Intermediate",
+            timeEstimate: "40 mins",
+            xpReward: 50,
+            status: "Locked",
+            concept: {
+              whatIsThis: "Auto-layout is a Figma feature that lets you create dynamic frames that respond to content size changes.",
+              whyItMatters: "It mimics flexbox in CSS, ensuring your button grows as you type or your layout is responsive.",
+              whereIsUsed: "Figma cards, navbars, item grids, and reusable components use auto-layout extensively.",
+              simpleExample: "Adding a padding of 16px horizontal and 8px vertical around a text layer automatically makes it a button.",
+              miniVisualization: "[ Text Label ] + Auto-layout padding = Resizable Button Component",
+              relatedConcepts: ["CSS Flexbox", "Constraints", "Grid Systems"],
+              quickPractice: "Create a frame in Figma, add Auto-layout, and see what happens when you set spacing to 20px.",
+              analogy: "Like a rubber band that stretches when you put more objects inside a bag."
+            }
+          },
+          {
+            id: "p2-d2",
+            dayNumber: 2,
+            title: "Build a Dynamic Navbar",
+            description: "Practice using Figma Auto-Layout to align menu links and responsive CTA buttons.",
+            type: "PRACTICE",
+            difficulty: "Intermediate",
+            timeEstimate: "1 hour",
+            xpReward: 100,
+            status: "Locked"
+          }
+        ],
+        checkpoint: {
+          title: "Phase 2 Checkpoint",
+          questions: [
+            {
+              question: "Which CSS layout engine is Figma Auto-Layout based on?",
+              options: ["CSS Grid", "Flexbox", "Absolute Positioning", "Floats"],
+              correctAnswer: "Flexbox"
+            }
+          ],
+          confidenceSkills: [
+            "I can build responsive components in Figma.",
+            "I know when to use Auto-layout vs. basic groups."
+          ],
+          passed: false
+        },
+        finalProject: {
+          title: "Interactive E-Commerce Card Grid",
+          description: "Create a grid of interactive cards with dynamic hover states, responsive layouts, and auto-layout tags.",
+          timeEstimate: "6 hours",
+          xpReward: 500,
+          portfolioValue: "High - Displays advanced Figma component construction and responsiveness rules.",
+          hiringImpact: "Critical",
+          status: "Locked"
+        }
       }
     ],
-    skillGaps: [
-      { name: 'Advanced System Architecture', level: 'Level 2 / 5', progressWidth: '2/5', colorClass: 'bg-primary', aiSuggestion: true },
-      { name: 'Infrastructure & Automation', level: 'Level 3 / 5', progressWidth: '3/5', colorClass: 'bg-secondary' },
-      { name: 'Security & Optimization', level: 'Level 4 / 5', progressWidth: '4/5', colorClass: 'bg-tertiary-container' }
-    ],
-    recommendedNextStep: {
-      category: 'Recommended Next Step',
-      title: `Grokking the ${targetRole} Core Concepts`,
-      desc: 'Master the critical scaling and integration patterns required for high-velocity startup operations.',
-      icon: 'school',
-      buttonLabel: 'Start Learning Module'
-    }
+    marketMetrics: { marketDemand: "", salaryRange: "", growthTrend: "", hiringMomentum: "", topHiringCompanies: [], aiConfidenceScore: 0, fastestGrowingSkills: [], remoteWorkDemand: "", aiImpact: "", competitionLevel: "", salaryTrendPoints: [], regionalHiring: [] },
+    alignment: { skillAlignment: 0, portfolioReadiness: 0, interviewReadiness: 0, marketCompetitiveness: 0, companyCompatibility: 0 },
+    skillNodes: [],
+    actions: [],
+    companyMatches: [],
+    stages: [],
+    skillGaps: [],
+    recommendedNextStep: { category: "", title: "", desc: "", icon: "", buttonLabel: "" }
   };
 
-  return callGeminiJSON<DynamicRoadmap>(prompt, fallback);
+  return callGroqJSON<DynamicRoadmap>(prompt, fallback);
 }
 
 /**
@@ -367,20 +631,79 @@ export async function analyzeResume(resumeText: string, targetRole: string): Pro
     Return strict, valid, professional JSON. No placeholders. Ensure suggestions directly quote or mention items relevant to ${targetRole}.
   `;
 
+  // Dynamic Rule-based fallback generator
+  const category = getRoleCategory(targetRole);
+  
+  const skillPools: Record<string, string[]> = {
+    'AI/ML': ['PyTorch', 'LLM', 'RAG', 'Python', 'MLOps', 'Transformers', 'CUDA', 'Deep Learning', 'TensorFlow', 'Quantization'],
+    'Cloud': ['Kubernetes', 'Docker', 'Terraform', 'CI/CD', 'AWS', 'GCP', 'Ansible', 'GitOps', 'Prometheus', 'Linux'],
+    'Cybersecurity': ['OWASP', 'Penetration Testing', 'SIEM', 'Zero-Trust', 'IAM', 'Encryption', 'TLS', 'SOC2', 'Firewalls', 'Wireshark'],
+    'Data': ['SQL', 'Snowflake', 'BigQuery', 'dbt', 'Airflow', 'Spark', 'ETL', 'Tableau', 'Data Warehousing', 'Python'],
+    'Product': ['Figma', 'A/B Testing', 'Product Roadmap', 'Wireframes', 'Amplitude', 'Mixpanel', 'PRD', 'Agile', 'Scrum', 'User Journeys'],
+    'Finance': ['Financial Modeling', 'DCF', 'LBO', 'Valuation', 'Excel', 'Corporate Finance', 'Accounting', 'Risk Analysis', 'Asset Allocation', 'Python'],
+    'Marketing': ['SEO', 'Google Analytics', 'Amplitude', 'PPC', 'Growth Loops', 'Referral Systems', 'CAC', 'LTV', 'A/B Testing', 'Copywriting'],
+    'Engineering': ['React', 'Node.js', 'TypeScript', 'JavaScript', 'REST APIs', 'PostgreSQL', 'Redis', 'System Design', 'Git', 'CSS']
+  };
+
+  const pool = skillPools[category] || skillPools['Engineering'];
+  const resumeLower = resumeText.toLowerCase();
+  
+  const matched = pool.filter(skill => resumeLower.includes(skill.toLowerCase()));
+  const missing = pool.filter(skill => !resumeLower.includes(skill.toLowerCase()));
+
+  // Calculate ATS Score dynamically
+  let rawScore = 55 + (matched.length * 5);
+  // Add penalties for common ATS formatting issues if detected
+  const hasTextboxes = resumeLower.includes('textbox') || resumeLower.includes('column') || resumeLower.includes('table');
+  if (hasTextboxes) rawScore -= 8;
+  if (rawScore > 96) rawScore = 96;
+  if (rawScore < 45) rawScore = 45;
+
+  let densityDesc = `Low density of critical technical markers. Found only ${matched.length} key competencies.`;
+  let matchLevel = 'Low';
+  if (matched.length >= 6) {
+    densityDesc = `Excellent alignment! Found ${matched.length} core keywords matching the standard ${targetRole} matrix.`;
+    matchLevel = 'High';
+  } else if (matched.length >= 3) {
+    densityDesc = `Moderate keyword density. Found ${matched.length} target indicators, but key areas remain unaddressed.`;
+    matchLevel = 'Medium';
+  }
+
+  // Google formula examples matching category
+  let strongGoogleExample = '"Designed and scaled a modular architecture, increasing system throughput by 32% over 3 months by implementing parallel processing queues."';
+  let weakGoogleExample = '"Helped with the design and maintenance of our main backend and cloud databases."';
+  
+  if (category === "AI/ML") {
+    strongGoogleExample = '"Fine-tuned an open-source 8B parameter LLM using LoRA adapters, reducing operational inference cost by 42% while improving model accuracy by 6.4%."';
+    weakGoogleExample = '"Worked on training models and adding vector embeddings to our search search engine."';
+  } else if (category === "Cloud") {
+    strongGoogleExample = '"Automated infrastructure deployment with Terraform, cutting infrastructure provisioning latency from 2 days to 14 minutes with GitOps pipelines."';
+    weakGoogleExample = '"Managed servers, setup Kubernetes clusters, and handled general cloud configurations."';
+  } else if (category === "Cybersecurity") {
+    strongGoogleExample = '"Audited and secured microservice ingress controllers, blocking 100% of OWASP injections and raising security audit score to 99%."';
+    weakGoogleExample = '"Ran vulnerability scans and helped the developers fix code exploits."';
+  } else if (category === "Data") {
+    strongGoogleExample = '"Refactored analytics SQL queries in dbt, reducing Snowflake query processing compute cost by 34% (saving $12,000 monthly)."';
+    weakGoogleExample = '"Wrote database pipelines, cleaned SQL reports, and made cohort dashboards."';
+  } else if (category === "Product") {
+    strongGoogleExample = '"Re-designed the user registration sequence in Figma, increasing user trial activation rates by 18% over a 30-day cohort run."';
+    weakGoogleExample = '"Led design workshops and helped engineers decide features for the new release."';
+  }
+
   const fallback: DynamicResumeFeedback = {
-    atsScore: 78,
-    keywordMatch: 'Medium',
-    keywordMatchDesc: 'Good usage of technical terms, but lacks strategic cloud deployment terminology.',
+    atsScore: rawScore,
+    keywordMatch: matchLevel,
+    keywordMatchDesc: densityDesc,
     actionableSuggestions: [
       {
         type: 'warning',
         title: 'Quantify your accomplishments',
-        desc: `Modify experience descriptions under your previous roles to explicitly mention numeric percentages (e.g. reduced load times by 20%, optimized cost by 15%).`
+        desc: `Modify experience descriptions under your previous roles to explicitly mention numeric percentages (e.g., reduced load times by 20%, optimized costs by $15k).`
       },
       {
         type: 'add',
-        title: `Add core ${targetRole} skill keywords`,
-        desc: `Explicitly integrate missing keywords such as high-availability clustering, system optimizations, and enterprise pipelines to pass strict ATS filters.`
+        title: `Add core ${targetRole} keywords`,
+        desc: `Explicitly integrate missing keywords such as ${missing.slice(0, 2).join(", ") || 'system design methodologies'} to pass strict ATS filters.`
       }
     ],
     priorityFixes: [
@@ -389,47 +712,47 @@ export async function analyzeResume(resumeText: string, targetRole: string): Pro
         colorClass: 'text-on-error-container',
         bgClass: 'bg-error-container',
         title: 'Missing quantified impact in achievements',
-        desc: 'At least 3 bullet points in your experience history are static descriptions. Rewrite using the X-Y-Z framework.'
+        desc: 'At least 3 accomplishments are written as static duties. Rewrite them using Google\'s X-Y-Z framework (Accomplished [X], measured by [Y], by doing [Z]).'
       },
       {
         icon: 'extension',
         colorClass: 'text-tertiary',
         bgClass: 'bg-tertiary/10',
-        title: 'Incorporate modern pipeline tools',
-        desc: `For a ${targetRole}, incorporating automated orchestration and container clustering tools is a top 3 filter requirement.`
+        title: `Incorporate modern ${category} tool chains`,
+        desc: `Recruiters filter heavily for tool competencies. Incorporate tools like ${missing.slice(0, 3).join(", ") || 'advanced frameworks'} into your experience statements.`
       },
       {
         icon: 'format_paint',
         colorClass: 'text-secondary',
         bgClass: 'bg-secondary-container/20',
-        title: 'Standardize date formatting',
-        desc: 'Your older roles utilize varying date formats. Standardize all employment periods to the MM/YYYY format.'
+        title: 'Remove complex layout elements',
+        desc: 'Your CV layout contains multi-column blocks or graphics. ATS parsers are linear; simplify to single-column standard flow.'
       }
     ],
     atsChecklist: [
       { label: 'Standard Section Headers', status: 'Pass' },
       { label: 'Machine-Readable Fonts', status: 'Pass' },
-      { label: 'No Complex Columns/Tables', status: 'Fail' }
+      { label: 'No Complex Columns/Tables', status: hasTextboxes ? 'Fail' : 'Pass' }
     ],
-    matchedSkills: ['Core Architecture', 'Team Collaboration', 'Software Design'],
-    missingSkills: ['Automated Testing', 'Cloud Scaling', 'Orchestration Tools'],
+    matchedSkills: matched.length > 0 ? matched.slice(0, 4) : ['Core Development', 'Version Control', 'Software Lifecycle'],
+    missingSkills: missing.length > 0 ? missing.slice(0, 3) : ['High-throughput Architectures', 'Cloud Operations'],
     googleFormulaAnalysis: [
       {
         type: 'strong',
         title: 'Strong Impact Example',
-        example: '"Designed and scaled a modular architecture, increasing system throughput by 32% over 3 months by implementing parallel processing queues."',
+        example: strongGoogleExample,
         badges: ['Action Verb', 'Quantified Impact']
       },
       {
         type: 'weak',
         title: 'Needs Improvement Example',
-        example: '"Helped with the design and maintenance of our main backend and cloud databases."',
-        badges: ["Weak Verb ('Helped')", 'No Metrics']
+        example: weakGoogleExample,
+        badges: ["Weak Verb", 'No Metrics']
       }
     ]
   };
 
-  return callGeminiJSON<DynamicResumeFeedback>(prompt, fallback);
+  return callGroqJSON<DynamicResumeFeedback>(prompt, fallback);
 }
 
 /**
@@ -456,14 +779,71 @@ export async function generateInterviewQuestions(targetRole: string): Promise<Dy
     questions: DynamicInterviewQuestion[];
   }
 
-  const fallback: FallbackResponse = {
-    questions: [
-      { id: 1, text: `Can you describe a time when you had to balance user needs with strict technical constraints on a tight deadline while architecting for a ${targetRole} role?` },
-      { id: 2, text: `How do you approach designing a highly available, fault-tolerant system that can scale gracefully under sudden traffic spikes?` },
-      { id: 3, text: `Walk me through how you optimize database index strategies and caching layers to minimize query latency and resource bottlenecks.` },
-      { id: 4, text: `Describe a situation where a critical system you built failed in production. How did you diagnose, mitigate, and prevent the issue from recurring?` },
-      { id: 5, text: `How do you collaborate with cross-functional product and design teams to translate complex engineering constraints into user-centric interfaces?` }
+  const category = getRoleCategory(targetRole);
+
+  const questionsPools: Record<string, string[]> = {
+    'AI/ML': [
+      `Can you explain the mathematical differences between pre-training and fine-tuning an LLM? When would you use LoRA vs full weight adjustments?`,
+      `How do you design a retrieval-augmented generation (RAG) system with sub-second latencies over billions of tokens? Detail your index structure.`,
+      `Describe how you debugged a model convergence or vanishing gradient issue during a large-scale training run.`,
+      `How would you handle hardware boundaries, such as fitting a 70B parameter model on a single GPU server using quantization?`,
+      `Talk about a time you had to optimize GPU compute throughput. How did you identify bottlenecks in your data loaders?`
+    ],
+    'Cloud': [
+      `How do you architect a secure VPC across multi-zones? Walk through subnets, gateways, and security access logs.`,
+      `Explain how a Kubernetes cluster manages Pod networking and how you scale nodes dynamically based on load.`,
+      `Describe a zero-downtime microservice migration strategy you implemented for a high-traffic endpoint.`,
+      `How do you set up system alerting rules in Prometheus to capture memory leaks before they trigger OOM kills?`,
+      `Explain how you handle shared state locks and state file recovery inside multi-engineer Terraform workflows.`
+    ],
+    'Cybersecurity': [
+      `Walk through how you audit and test a web app API for OWASP Top 10 vulnerabilities (e.g., SSRF or broken authentication).`,
+      `How do you design a secure Zero-Trust IAM access control system for developers working across hybrid clouds?`,
+      `Describe how you would isolate resources and run forensics during a suspected active API token compromise.`,
+      `Explain TLS handshakes in detail. How do you secure data transmission against adversary-in-the-middle attacks?`,
+      `How do you build a secure SIEM logging infrastructure that prevents log tampering or deletion by malicious actors?`
+    ],
+    'Data': [
+      `How do you design an ingestion pipeline that handles late-arriving data while ensuring absolute idempotency?`,
+      `Compare row-oriented databases to columnar data warehouses. In what scenarios would you choose BigQuery vs Postgres?`,
+      `How do you partition and index warehouse tables to ensure analytical queries return in seconds over billions of rows?`,
+      `Describe how you deploy automated dbt validation testing to flag malformed data in an upstream database feed.`,
+      `Walk through how you modeled user cohorts to calculate accurate customer retention metrics and user lifecycles.`
+    ],
+    'Product': [
+      `How do you prioritize a product roadmap when engineering resources are tight and stakeholders present competing needs?`,
+      `Describe how you would design an onboarding experience that reduces product churn rates during the first week.`,
+      `How do you use behavioral cohort data (e.g. Mixpanel) to locate where users get stuck in a conversion funnel?`,
+      `Walk us through a feature you designed and launched that failed. How did you measure failure and pivot?`,
+      `How do you translate complex technical constraints from developers into simple, delighting user interface screens?`
+    ],
+    'Finance': [
+      `Walk me through a 3-statement financial model and explain how a change in capital depreciation flows through them.`,
+      `How do you calculate Weighted Average Cost of Capital (WACC)? What macro indicators shift WACC values?`,
+      `Detail the differences between leveraged buyout (LBO) and DCF models. When is LBO preferred for valuation?`,
+      `How do you evaluate structural covenants and credit metrics when advising a corporate borrower?`,
+      `What is your investment thesis on a recent macro market trend, and how does it influence equity pricing?`
+    ],
+    'Marketing': [
+      `How do you configure multi-touch attribution models to accurately measure organic and paid social acquisition loops?`,
+      `Walk through a viral growth loop you engineered that resulted in compounding organic user signups.`,
+      `How do you determine target CAC limitations based on customer LTV, churn rates, and startup margins?`,
+      `What is your approach to technical SEO audits? Detail indexation, crawl budgets, and site architecture controls.`,
+      `Describe an A/B test run on a key conversion flow. How did you compute and verify statistical significance?`
+    ],
+    'Engineering': [
+      `Compare REST vs GraphQL vs gRPC. When would you prefer one over the others in a microservices setup?`,
+      `How do you implement a distributed caching layer (e.g. Redis) to minimize database query latency and resource bottlenecks?`,
+      `Walk us through a time you debugged a memory leak or optimized component re-render speeds in a client app.`,
+      `How do you manage production database schema migrations on tables containing millions of active records?`,
+      `Describe your approach to designing a highly available, fault-tolerant system that can handle sudden traffic spikes.`
     ]
+  };
+
+  const questions = questionsPools[category] || questionsPools['Engineering'];
+
+  const fallback: FallbackResponse = {
+    questions: questions.map((text, idx) => ({ id: idx + 1, text }))
   };
 
   try {
@@ -501,12 +881,57 @@ export async function generateInterviewFeedback(
     Keep it encouraging but highly precise, reflecting elite startup interview expectations.
   `;
 
+  // Dynamic feedback analyzer based on candidate's answer text metrics
+  const answerLower = answer.toLowerCase();
+  
+  // Count key STAR methodology keywords
+  const starWords = ["situation", "task", "action", "result", "metric", "%", "percent", "scale", "optimize", "lead", "led", "solve", "reduce", "increase", "achieved", "designed"];
+  const matches = starWords.filter(word => answerLower.includes(word));
+  
+  const wordCount = answer.trim().split(/\s+/).filter(Boolean).length;
+  const isSTAR = matches.length >= 3;
+
+  // Simulated pacing rate based on word count
+  let pacingText = "Steady";
+  let pacingWPM = 124;
+
+  if (wordCount < 20) {
+    pacingText = "Too Brief";
+    pacingWPM = 158;
+  } else if (wordCount > 200) {
+    pacingText = "Too Wordy";
+    pacingWPM = 108;
+  } else if (wordCount < 50) {
+    pacingText = "Steady but Brief";
+    pacingWPM = 118;
+  }
+
+  // Calculate confidence index dynamically
+  let score = 55 + (matches.length * 5);
+  if (wordCount >= 40 && wordCount <= 180) {
+    score += 15; // sweet spot for answer length
+  }
+  if (score > 96) score = 96;
+  if (score < 40) score = 40;
+
+  // Custom actionable coaching tip
+  let tip = "";
+  if (wordCount < 25) {
+    tip = "Your response is very brief. Expand it by explaining the specific context, the technical challenge you faced, and your step-by-step actions.";
+  } else if (!isSTAR) {
+    tip = "Good technical points, but structure it using the STAR framework. Clearly define the Situation, the Task, the Actions you personally took, and the final outcomes.";
+  } else if (matches.length < 5) {
+    tip = "Great logical flow. To make it bulletproof, quantify the final business outcomes using metrics like server load reductions, throughput increases, or dollars saved.";
+  } else {
+    tip = "Excellent! You have dynamic STAR anchors, clear task ownership, and quantified metrics. This is a very strong response.";
+  }
+
   const fallback: DynamicInterviewFeedback = {
-    coachingTip: "Excellent logical structure. To make it stronger, quantify your impact immediately with metrics like server load reduction percentages or concrete latency savings.",
-    confidenceIndex: 85,
-    pacingRateText: "Steady",
-    pacingWordsPerMin: 124,
-    isSTARCompliant: true
+    coachingTip: tip,
+    confidenceIndex: score,
+    pacingRateText: pacingText,
+    pacingWordsPerMin: pacingWPM,
+    isSTARCompliant: isSTAR
   };
 
   return callGroqJSON<DynamicInterviewFeedback>(prompt, fallback);
@@ -558,25 +983,109 @@ export async function generateMarketInsights(
     Note on CSS box models: The whisker lines and boxes are drawn in a vertical chart. Ensure your bottom and height percentages align properly so the rendering is beautifully aligned and visually accurate.
   `;
 
-  let fallbackMin = 120000;
-  let fallbackMax = 280000;
-  let fallbackMedian = 195000;
-  let fallbackP25 = 150000;
-  let fallbackP75 = 240000;
-
-  if (experience.includes('L4')) {
-    fallbackMin = 90000;
-    fallbackMax = 180000;
-    fallbackMedian = 130000;
-    fallbackP25 = 110000;
-    fallbackP75 = 150000;
-  } else if (experience.includes('L6')) {
-    fallbackMin = 180000;
-    fallbackMax = 440000;
-    fallbackMedian = 310000;
-    fallbackP25 = 240000;
-    fallbackP75 = 370000;
+  // Scale raw salary numbers based on geographic index (keeping raw USD format)
+  let geoScale = 1.0;
+  const loc = location.toLowerCase();
+  
+  if (loc.includes('bangalore') || loc.includes('bengaluru') || loc.includes('india') || loc.includes('mumbai') || loc.includes('delhi') || loc.includes('hyderabad') || loc.includes('pune')) {
+    geoScale = 0.28; // India market salary scale in equivalent USD
+  } else if (loc.includes('london') || loc.includes('uk') || loc.includes('europe') || loc.includes('berlin') || loc.includes('amsterdam') || loc.includes('germany') || loc.includes('paris')) {
+    geoScale = 0.76; // European standard scale
+  } else if (loc.includes('francisco') || loc.includes('sf') || loc.includes('bay') || loc.includes('seattle') || loc.includes('york') || loc.includes('nyc') || loc.includes('california')) {
+    geoScale = 1.15; // Tier-1 high cost tech hubs
   }
+
+  let baseMin = 120000;
+  let baseMax = 280000;
+  let baseMedian = 195000;
+  let baseP25 = 150000;
+  let baseP75 = 240000;
+
+  const exp = experience.toLowerCase();
+  if (exp.includes('l4') || exp.includes('junior') || exp.includes('entry') || exp.includes('associate')) {
+    baseMin = 85000;
+    baseMax = 160000;
+    baseMedian = 120000;
+    baseP25 = 100000;
+    baseP75 = 140000;
+  } else if (exp.includes('l6') || exp.includes('staff') || exp.includes('principal') || exp.includes('director') || exp.includes('lead') || exp.includes('senior')) {
+    baseMin = 180000;
+    baseMax = 440000;
+    baseMedian = 310000;
+    baseP25 = 240000;
+    baseP75 = 370000;
+  }
+
+  const minSalary = Math.round(baseMin * geoScale);
+  const maxSalary = Math.round(baseMax * geoScale);
+  const medianSalary = Math.round(baseMedian * geoScale);
+  const p25Salary = Math.round(baseP25 * geoScale);
+  const p75Salary = Math.round(baseP75 * geoScale);
+
+  // Customize skills list based on role category
+  const category = getRoleCategory(role);
+  let premiums = [
+    { name: 'Advanced System Architecture', percentage: '+24%', colorClass: 'bg-primary' },
+    { name: 'Distributed Caching & Orchestration', percentage: '+16%', colorClass: 'bg-secondary' },
+    { name: 'Rust / Systems Development', percentage: '+14%', colorClass: 'bg-tertiary-container' },
+    { name: 'React 19 & Next.js App Router', percentage: '+8%', colorClass: 'bg-outline' }
+  ];
+
+  if (category === "AI/ML") {
+    premiums = [
+      { name: 'PyTorch & Neural Training', percentage: '+34%', colorClass: 'bg-primary' },
+      { name: 'Vector DBs & semantic search', percentage: '+22%', colorClass: 'bg-secondary' },
+      { name: 'CUDA Kernel Optimizations', percentage: '+20%', colorClass: 'bg-tertiary-container' },
+      { name: 'Model Quantization & Deploy', percentage: '+15%', colorClass: 'bg-outline' }
+    ];
+  } else if (category === "Cloud") {
+    premiums = [
+      { name: 'Kubernetes Administration', percentage: '+26%', colorClass: 'bg-primary' },
+      { name: 'Terraform Infrastructure IaC', percentage: '+18%', colorClass: 'bg-secondary' },
+      { name: 'Multi-Cloud VPC Routing', percentage: '+15%', colorClass: 'bg-tertiary-container' },
+      { name: 'Prometheus Log Monitoring', percentage: '+8%', colorClass: 'bg-outline' }
+    ];
+  } else if (category === "Cybersecurity") {
+    premiums = [
+      { name: 'Exploit Audits & PenTesting', percentage: '+28%', colorClass: 'bg-primary' },
+      { name: 'Zero-Trust IAM Systems', percentage: '+22%', colorClass: 'bg-secondary' },
+      { name: 'SIEM Logging & Incident Plans', percentage: '+14%', colorClass: 'bg-tertiary-container' },
+      { name: 'SOC2 Compliance Standards', percentage: '+10%', colorClass: 'bg-outline' }
+    ];
+  } else if (category === "Data") {
+    premiums = [
+      { name: 'Snowflake / BigQuery Schemas', percentage: '+22%', colorClass: 'bg-primary' },
+      { name: 'Apache Spark Data Streaming', percentage: '+18%', colorClass: 'bg-secondary' },
+      { name: 'dbt Transformation Modeling', percentage: '+16%', colorClass: 'bg-tertiary-container' },
+      { name: 'Airflow Pipeline Scheduling', percentage: '+10%', colorClass: 'bg-outline' }
+    ];
+  } else if (category === "Product") {
+    premiums = [
+      { name: 'Figma Layout Prototyping', percentage: '+20%', colorClass: 'bg-primary' },
+      { name: 'Amplitude Analytics Tracking', percentage: '+16%', colorClass: 'bg-secondary' },
+      { name: 'A/B Test Funnel Optimization', percentage: '+15%', colorClass: 'bg-tertiary-container' },
+      { name: 'Agile Product Specifications', percentage: '+8%', colorClass: 'bg-outline' }
+    ];
+  } else if (category === "Finance") {
+    premiums = [
+      { name: 'DCF / LBO Modeling Structures', percentage: '+24%', colorClass: 'bg-primary' },
+      { name: 'M&A Advisory Valuation', percentage: '+18%', colorClass: 'bg-secondary' },
+      { name: 'Derivatives & Portfolio Risk', percentage: '+15%', colorClass: 'bg-tertiary-container' },
+      { name: 'Capital Debt Restructuring', percentage: '+10%', colorClass: 'bg-outline' }
+    ];
+  } else if (category === "Marketing") {
+    premiums = [
+      { name: 'Growth loop Optimization', percentage: '+25%', colorClass: 'bg-primary' },
+      { name: 'Technical SEO Auditing', percentage: '+18%', colorClass: 'bg-secondary' },
+      { name: 'Ad Copy Conversion Optimizations', percentage: '+14%', colorClass: 'bg-tertiary-container' },
+      { name: 'Cohort LTV/CAC Analyzers', percentage: '+12%', colorClass: 'bg-outline' }
+    ];
+  }
+
+  // Customize market hubs
+  const primaryHub = location.trim() ? location : (category === "Engineering" || category === "AI/ML" ? "San Francisco" : "New York");
+  const secondaryHub = geoScale < 0.5 ? "Mumbai Hub" : "Seattle Tech Hub";
+  const tertiaryHub = geoScale < 0.5 ? "Hyderabad Hub" : "Austin Tech Hub";
 
   const fallback: DynamicMarketData = {
     salaryPercentiles: {
@@ -585,37 +1094,32 @@ export async function generateMarketInsights(
       boxHeight: '40%',
       boxBottom: '25%',
       medianTop: '45%',
-      minSalary: fallbackMin,
-      maxSalary: fallbackMax,
-      medianSalary: fallbackMedian,
-      p25Salary: fallbackP25,
-      p75Salary: fallbackP75
+      minSalary,
+      maxSalary,
+      medianSalary,
+      p25Salary,
+      p75Salary
     },
-    skillPremiums: [
-      { name: 'Advanced System Architecture', percentage: '+24%', colorClass: 'bg-primary' },
-      { name: 'Distributed Caching & Orchestration', percentage: '+16%', colorClass: 'bg-secondary' },
-      { name: 'Rust / Systems Development', percentage: '+14%', colorClass: 'bg-tertiary-container' },
-      { name: 'React 19 & Next.js App Router', percentage: '+8%', colorClass: 'bg-outline' }
-    ],
+    skillPremiums: premiums,
     marketHubs: [
       {
-        city: location === 'San Francisco' ? 'SF Bay Area' : location,
-        delta: '+16%',
-        trend: 'Hyper-demand in AI & Cloud integrations',
+        city: primaryHub,
+        delta: '+18%',
+        trend: `Surging demand for local ${role} specialists`,
         trendColor: 'text-primary',
         icon: 'local_fire_department'
       },
       {
-        city: 'Seattle Hub',
+        city: secondaryHub,
         delta: '+12%',
-        trend: 'Fintech & SaaS steady growth',
+        trend: 'High volume microservice integrations',
         trendColor: 'text-secondary',
         icon: 'arrow_upward'
       },
       {
-        city: 'Austin Tech Hub',
+        city: tertiaryHub,
         delta: '+8%',
-        trend: 'Security architectures active',
+        trend: 'Enterprise SaaS product scaling active',
         trendColor: 'text-on-surface-variant',
         icon: 'trending_flat'
       }
@@ -623,4 +1127,20 @@ export async function generateMarketInsights(
   };
 
   return callGroqJSON<DynamicMarketData>(prompt, fallback);
+}
+
+// ----------------------------------------------------
+// Private Helpers
+// ----------------------------------------------------
+
+function getRoleCategory(role: string): string {
+  const r = role.toLowerCase();
+  if (r.includes('ai') || r.includes('ml') || r.includes('prompt') || r.includes('llm') || r.includes('intelligence') || r.includes('machine learning')) return 'AI/ML';
+  if (r.includes('cloud') || r.includes('devops') || r.includes('reliability') || r.includes('platform') || r.includes('aws') || r.includes('infrastructure') || r.includes('sre')) return 'Cloud';
+  if (r.includes('cyber') || r.includes('security') || r.includes('hacker') || r.includes('penetration') || r.includes('red team')) return 'Cybersecurity';
+  if (r.includes('data') || r.includes('analyst') || r.includes('science') || r.includes('analytics') || r.includes('warehouse')) return 'Data';
+  if (r.includes('product') || r.includes('manager') || r.includes('design') || r.includes('ux') || r.includes('ui') || r.includes('figma')) return 'Product';
+  if (r.includes('finance') || r.includes('investment') || r.includes('bank') || r.includes('quant') || r.includes('accounting') || r.includes('valuation')) return 'Finance';
+  if (r.includes('marketing') || r.includes('growth') || r.includes('seo') || r.includes('acquisition') || r.includes('cac')) return 'Marketing';
+  return 'Engineering';
 }

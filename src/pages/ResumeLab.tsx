@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeResume, DynamicResumeFeedback } from '../utils/aiService';
-import { AVAILABLE_ROLES } from '../data/mockData';
+import { AVAILABLE_ROLES } from '../data/staticContent';
 import { useProfile } from '../context/ProfileContext';
 
 export default function ResumeLab() {
@@ -10,6 +10,10 @@ export default function ResumeLab() {
   const [resumeText, setResumeText] = useState('');
   const [targetRole, setTargetRole] = useState('Senior Cloud Architect');
   const [analysis, setAnalysis] = useState<DynamicResumeFeedback | null>(null);
+  
+  // Drag and drop states
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   const navigate = useNavigate();
 
@@ -27,6 +31,39 @@ export default function ResumeLab() {
       }
     }
   }, [profile]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFile(e.target.files[0]);
+    }
+  };
+  const handleFile = (file: File) => {
+    setUploadedFile(file);
+    // In a real application, you would parse the PDF/DOCX here.
+    // For this mock demo, we provide dummy extracted text or read the TXT directly.
+    if (file.type === 'text/plain' || file.name.endsWith('.md')) {
+      const reader = new FileReader();
+      reader.onload = (e) => setResumeText(e.target?.result as string);
+      reader.readAsText(file);
+    } else {
+      setResumeText(`[Extracted from ${file.name}] John Doe - Senior Professional. Experienced in solving complex problems. Used modern technologies and delivered business value.`);
+    }
+  };
 
   const handleStartAnalysis = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +89,8 @@ export default function ResumeLab() {
 
   const handleReset = async () => {
     setResumeText('');
+    setUploadedFile(null);
+    setIsDragging(false);
     setAnalysis(null);
     setUploadState('idle');
     try {
@@ -68,7 +107,7 @@ export default function ResumeLab() {
       <div className="min-h-[400px] flex items-center justify-center animate-pulse">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto"></div>
-          <p className="text-xs text-on-surface-variant font-bold">Synchronizing Resume Lab with Database...</p>
+          <p className="text-xs text-on-surface-variant font-bold">Synchronizing Resume Lab with Cloud...</p>
         </div>
       </div>
     );
@@ -79,7 +118,7 @@ export default function ResumeLab() {
       <header className="mb-8 flex justify-between items-start md:items-center gap-4 flex-wrap">
         <div>
           <h1 className="font-display-lg text-3xl md:text-4xl font-extrabold text-on-surface mb-2">Resume Lab</h1>
-          <p className="text-body-lg text-on-surface-variant font-medium">Optimize your CV against advanced ATS models and hiring algorithms.</p>
+          <p className="text-body-lg text-on-surface-variant font-medium">Optimize your CV against advanced ATS and LLM systems.</p>
         </div>
         {uploadState === 'results' && (
           <button
@@ -97,25 +136,66 @@ export default function ResumeLab() {
           <div className="lg:col-span-8 bg-surface-container-lowest border border-surface-container rounded-2xl p-6 shadow-premium space-y-4">
             <div className="flex justify-between items-center mb-1">
               <div>
-                <h4 className="text-sm font-bold text-on-surface">Paste Resume Content</h4>
-                <p className="text-xs text-on-surface-variant">Paste your current resume details below (experience, education, skills, projects).</p>
+                <h4 className="text-sm font-bold text-on-surface">Upload Resume Document</h4>
+                <p className="text-xs text-on-surface-variant">Drag and drop your PDF, DOCX, or text file below to analyze.</p>
               </div>
-              <span className="text-[10px] font-bold text-outline uppercase tracking-widest shrink-0">Text Input</span>
+              <span className="text-[10px] font-bold text-outline uppercase tracking-widest shrink-0">File Upload</span>
             </div>
             
-            <textarea
-              required
-              rows={14}
-              placeholder="PASTE YOUR RESUME HERE...&#10;&#10;e.g.&#10;John Doe - Software Engineer&#10;Experience:&#10;- Led team to rebuild cloud-native backend on AWS...&#10;- Maintained database and API services..."
-              value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-              className="w-full bg-surface border border-outline-variant/30 rounded-xl p-4 text-xs font-medium text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-y min-h-[300px]"
-            />
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all min-h-[300px]
+                ${isDragging 
+                  ? 'border-primary bg-primary/5' 
+                  : uploadedFile 
+                    ? 'border-primary/50 bg-surface' 
+                    : 'border-outline-variant/40 bg-surface hover:bg-surface-container-low hover:border-outline-variant/80'
+                }
+              `}
+            >
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.txt,.md"
+                onChange={handleFileChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              
+              {uploadedFile ? (
+                <div className="space-y-4 animate-fade-in pointer-events-none">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto text-primary">
+                    <span className="material-symbols-outlined text-3xl">task</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-on-surface">{uploadedFile.name}</p>
+                    <p className="text-xs text-on-surface-variant mt-1">
+                      {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB • Ready for analysis
+                    </p>
+                  </div>
+                  <p className="text-xs font-semibold text-primary">Click or drag a new file to replace</p>
+                </div>
+              ) : (
+                <div className="space-y-4 pointer-events-none">
+                  <div className="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mx-auto text-on-surface-variant">
+                    <span className="material-symbols-outlined text-3xl">upload_file</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-on-surface">Drag & drop your resume</p>
+                    <p className="text-xs text-on-surface-variant mt-1">or click to browse from your computer</p>
+                  </div>
+                  <p className="text-[10px] font-semibold text-outline uppercase tracking-wider">
+                    Supports PDF, DOCX, TXT
+                  </p>
+                </div>
+              )}
+            </div>
 
             <div className="flex justify-end">
               <button
                 type="submit"
-                className="px-6 py-3 bg-primary text-on-primary rounded-xl text-xs font-bold shadow-md hover:bg-primary/95 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                disabled={!uploadedFile && !resumeText.trim()}
+                className="px-6 py-3 bg-primary text-on-primary rounded-xl text-xs font-bold shadow-md hover:bg-primary/95 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-sm font-bold">query_stats</span>
                 Analyze with AI Agent

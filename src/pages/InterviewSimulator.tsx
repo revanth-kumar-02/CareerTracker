@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { generateInterviewQuestions, generateInterviewFeedback, DynamicInterviewQuestion, DynamicInterviewFeedback } from '../utils/aiService';
 import CircularProgress from '../components/ui/CircularProgress';
-import { saveInterviewSession } from '../utils/supabaseClient';
 import { useProfile } from '../context/ProfileContext';
 
 interface ChatMessage {
@@ -44,6 +43,7 @@ export default function InterviewSimulator() {
   const [sessionFinished, setSessionFinished] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef(false);
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -54,10 +54,7 @@ export default function InterviewSimulator() {
       rec.interimResults = false;
       rec.lang = 'en-US';
 
-      rec.onstart = () => {
-        setIsRecording(true);
-      };
-
+      rec.onstart = () => setIsRecording(true);
       rec.onresult = (event: any) => {
         const transcript = event.results[event.results.length - 1][0].transcript;
         if (transcript) {
@@ -67,15 +64,11 @@ export default function InterviewSimulator() {
           });
         }
       };
-
       rec.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
         setIsRecording(false);
       };
-
-      rec.onend = () => {
-        setIsRecording(false);
-      };
+      rec.onend = () => setIsRecording(false);
 
       recognitionRef.current = rec;
     }
@@ -83,7 +76,14 @@ export default function InterviewSimulator() {
 
   // Load questions on mount
   useEffect(() => {
+    if (initializedRef.current) return;
+
     async function loadSession() {
+      if (!location.state || !location.state.targetRole) {
+        if (!profile) return;
+      }
+
+      initializedRef.current = true;
       setLoading(true);
       try {
         let activeRole = config.targetRole;
@@ -103,13 +103,14 @@ export default function InterviewSimulator() {
           setChatHistory([
             {
               sender: 'ai',
-              text: `Hello! Welcome to your immersive AI interview for the role of ${activeRole}. Let's begin. Question 1: ${generated[0].text}`,
+              text: `Hello! Welcome to your immersive AI interview for the role of ${activeRole}. Let's begin.\n\nHere is your first question:\n"${generated[0].text}"`,
               avatar: 'smart_toy'
             }
           ]);
         }
       } catch (e) {
         console.error(e);
+        initializedRef.current = false;
       } finally {
         setLoading(false);
       }
@@ -120,9 +121,7 @@ export default function InterviewSimulator() {
   // Keep a running session timer
   useEffect(() => {
     if (sessionFinished || loading) return;
-    const interval = setInterval(() => {
-      setTimerSeconds(prev => prev + 1);
-    }, 1000);
+    const interval = setInterval(() => setTimerSeconds(prev => prev + 1), 1000);
     return () => clearInterval(interval);
   }, [sessionFinished, loading]);
 
@@ -131,7 +130,6 @@ export default function InterviewSimulator() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, submitting]);
 
-  // Format timer seconds into MM:SS
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
@@ -140,9 +138,8 @@ export default function InterviewSimulator() {
 
   const handleMicToggle = () => {
     if (!recognitionRef.current) {
-      // Speech recognition not supported or denied. Fallback to mock text.
       if (inputValue) return;
-      setInputValue("Certainly. In my last project, we had to migrate a monolithic backend to serverless cloud infrastructure on a tight 3-week deadline. To maintain high availability, I designed parallel deployment modules using AWS Lambda with optimized API Gateway throttling rates. This mitigated our database bottleneck and resulted in a 40% latency saving under high load.");
+      setInputValue("Certainly. In my last project, we had to migrate a monolithic backend to serverless cloud infrastructure on a tight deadline. To maintain high availability, I designed parallel deployment modules using AWS Lambda with optimized API Gateway throttling rates. This mitigated our database bottleneck and resulted in a 40% latency saving under high load.");
       return;
     }
 
@@ -163,38 +160,26 @@ export default function InterviewSimulator() {
     e.preventDefault();
     if (!inputValue.trim() || submitting || sessionFinished || questions.length === 0) return;
 
-    // Stop recording if active when submitting
     if (isRecording && recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (err) {
-        console.error(err);
-      }
+      try { recognitionRef.current.stop(); } catch (err) { console.error(err); }
       setIsRecording(false);
     }
 
     const currentQuestion = questions[currentIdx].text;
     const userAnswer = inputValue.trim();
 
-    // 1. Add user answer to chat
     setChatHistory(prev => [
       ...prev,
-      {
-        sender: 'user',
-        text: userAnswer,
-        avatar: 'person'
-      }
+      { sender: 'user', text: userAnswer, avatar: 'person' }
     ]);
     setAnswers(prev => [...prev, userAnswer]);
     setInputValue('');
     setSubmitting(true);
 
     try {
-      // 2. Call Gemini for constructive feedback
       const feedback = await generateInterviewFeedback(currentQuestion, userAnswer, config.targetRole);
       setFeedbackHistory(prev => [...prev, feedback]);
 
-      // 3. Append feedback bubble in chat
       setChatHistory(prev => [
         ...prev,
         {
@@ -205,31 +190,21 @@ export default function InterviewSimulator() {
         }
       ]);
 
-      // 4. Move to next question or complete session
       if (currentIdx < questions.length - 1) {
         const nextIdx = currentIdx + 1;
         setCurrentIdx(nextIdx);
         
-        // Brief delay before AI drops the next question
         setTimeout(() => {
           setChatHistory(prev => [
             ...prev,
-            {
-              sender: 'ai',
-              text: `Question ${nextIdx + 1}: ${questions[nextIdx].text}`,
-              avatar: 'smart_toy'
-            }
+            { sender: 'ai', text: `Great. Moving on to Question ${nextIdx + 1}:\n\n"${questions[nextIdx].text}"`, avatar: 'smart_toy' }
           ]);
         }, 1200);
       } else {
-        // All 5 questions completed! Save stats and finish.
         setSessionFinished(true);
         
-        // Calculate average confidence index
         const totalConf = feedbackHistory.reduce((sum, f) => sum + f.confidenceIndex, 0) + feedback.confidenceIndex;
         const avgConf = Math.round(totalConf / questions.length);
-
-        // Collect coaching recommendations
         const tips = [...feedbackHistory.map(f => f.coachingTip), feedback.coachingTip];
 
         const historyRecord = {
@@ -240,19 +215,14 @@ export default function InterviewSimulator() {
           coachingTips: tips.length > 0 ? tips : ["Focus on quantifying metrics using the STAR structure."]
         };
         
-        // Save session history and update user streak/XP in Supabase via context
-        await saveInterviewSession(historyRecord);
+        const newStreak = profile ? (profile.streak || 0) + 1 : 1;
+        const newXp = profile ? (profile.xp || 0) + 150 : 150;
+        await updateProfile({
+          interview_session: historyRecord,
+          streak: newStreak,
+          xp: newXp
+        });
         
-        if (profile) {
-          const newStreak = (profile.streak || 0) + 1;
-          const newXp = (profile.xp || 0) + 150;
-          await updateProfile({
-            streak: newStreak,
-            xp: newXp
-          });
-        }
-        
-        // Dispatch custom event to notify Sidebar/Layout
         window.dispatchEvent(new Event('profile-updated'));
       }
     } catch (error) {
@@ -263,9 +233,7 @@ export default function InterviewSimulator() {
   };
 
   const getLatestMetrics = () => {
-    if (feedbackHistory.length === 0) {
-      return { confidence: 80, pacing: 'Steady', wpm: 120 };
-    }
+    if (feedbackHistory.length === 0) return { confidence: 80, pacing: 'Steady', wpm: 120 };
     const latest = feedbackHistory[feedbackHistory.length - 1];
     return {
       confidence: latest.confidenceIndex,
@@ -277,139 +245,139 @@ export default function InterviewSimulator() {
   const metrics = getLatestMetrics();
 
   return (
-    <div className="space-y-6 animate-fade-in max-h-[calc(100vh-8rem)] flex flex-col pb-16">
+    <div className="animate-fade-in flex flex-col min-h-[calc(100vh-6rem)] pb-16 max-w-7xl mx-auto font-sans">
       
-      {/* Header/Status */}
-      <div className="flex justify-between items-center bg-surface-container-lowest rounded-xl p-4 border border-surface-container shadow-sm shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="relative flex h-3 w-3 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+      {/* Premium Spacious Header */}
+      <div className="flex justify-between items-end mb-8 shrink-0 px-4">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="relative flex h-3 w-3 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+            </div>
+            <p className="text-[11px] font-extrabold text-primary uppercase tracking-[0.2em]">Active Simulation</p>
           </div>
-          <div>
-            <h2 className="text-sm font-bold text-on-surface">{config.targetRole}</h2>
-            <p className="text-[10px] text-on-surface-variant font-semibold">{config.interviewType}</p>
-          </div>
+          <h2 className="text-2xl md:text-3xl font-black text-on-surface tracking-tight leading-none">{config.targetRole}</h2>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-sm font-bold text-on-surface font-mono">{formatTime(timerSeconds)}</div>
+        
+        <div className="flex flex-col items-end gap-3">
+          <div className="text-xl md:text-2xl font-black text-on-surface font-mono tracking-tight">{formatTime(timerSeconds)}</div>
           <button
             onClick={() => navigate('/interview')}
-            className="flex items-center gap-1 px-3 py-1.5 border border-error/20 bg-error/5 text-error hover:bg-error hover:text-on-error rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 bg-error/10 text-error hover:bg-error hover:text-on-error rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm">stop_circle</span>
+            <span className="material-symbols-outlined text-[16px]">stop_circle</span>
             End Session
           </button>
         </div>
       </div>
 
       {loading ? (
-        /* Dynamic Simulator Loader */
-        <div className="flex-1 flex flex-col items-center justify-center bg-surface-container-lowest border border-surface-container rounded-2xl p-12 text-center shadow-premium min-h-[400px]">
-          <div className="w-16 h-16 rounded-full border-4 border-primary/10 border-t-primary animate-spin mb-4"></div>
-          <h3 className="text-base font-extrabold text-on-surface">Initializing Immersive Simulator</h3>
-          <p className="text-xs text-on-surface-variant mt-1.5 font-medium max-w-sm">Generating highly-targeted professional Q&amp;A models for "{config.targetRole}" using Gemini...</p>
+        <div className="flex-1 flex flex-col items-center justify-center bg-surface-container-lowest border border-surface-container/50 rounded-3xl p-12 text-center shadow-premium mx-4">
+          <div className="w-16 h-16 rounded-full border-4 border-primary/10 border-t-primary animate-spin mb-6 shadow-sm"></div>
+          <h3 className="text-xl font-black text-on-surface tracking-tight">Initializing Coaching Engine</h3>
+          <p className="text-sm text-on-surface-variant mt-2 font-medium max-w-md leading-relaxed">
+            Generating highly-targeted professional Q&amp;A models for "{config.targetRole}"...
+          </p>
         </div>
       ) : sessionFinished ? (
-        /* Immersive Scorecard Wrapup screen */
-        <div className="flex-1 bg-surface-container-lowest border border-surface-container rounded-2xl p-8 shadow-premium flex flex-col items-center justify-center text-center space-y-6 overflow-y-auto">
-          <div className="w-20 h-20 bg-primary/5 rounded-full border-2 border-primary/20 flex items-center justify-center text-primary shadow-inner">
-            <span className="material-symbols-outlined text-4xl fill animate-pulse">auto_awesome</span>
+        <div className="flex-1 bg-surface-container-lowest border border-surface-container/50 rounded-3xl p-12 shadow-premium flex flex-col items-center justify-center text-center space-y-8 overflow-y-auto mx-4">
+          <div className="w-24 h-24 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-full border border-primary/20 flex items-center justify-center text-primary shadow-inner">
+            <span className="material-symbols-outlined text-5xl fill animate-pulse">workspace_premium</span>
           </div>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-black text-on-surface">Simulator Session Complete</h2>
-            <p className="text-xs text-on-surface-variant font-medium">Excellent work! Your interview metrics have been successfully calibrated.</p>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-black text-on-surface tracking-tight">Session Complete</h2>
+            <p className="text-sm text-on-surface-variant font-medium">Your interview metrics have been successfully calibrated.</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-xl w-full">
-            <div className="bg-surface p-6 rounded-xl border border-surface-container flex flex-col items-center justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-w-2xl w-full">
+            <div className="bg-surface p-8 rounded-3xl border border-surface-container flex flex-col items-center justify-center shadow-sm">
               <CircularProgress
                 value={metrics.confidence}
                 max={100}
-                size={110}
-                strokeWidth={8}
+                size={130}
+                strokeWidth={10}
                 color="#6b38d4"
               >
-                <span className="text-3xl font-black text-on-surface">{metrics.confidence}%</span>
+                <span className="text-4xl font-black text-on-surface tracking-tight">{metrics.confidence}%</span>
               </CircularProgress>
-              <span className="text-[10px] font-bold text-outline uppercase tracking-wider mt-3">Avg Confidence Score</span>
+              <span className="text-[10px] font-extrabold text-outline uppercase tracking-widest mt-5">Avg Confidence Score</span>
             </div>
 
-            <div className="bg-surface p-6 rounded-xl border border-surface-container flex flex-col items-center justify-center space-y-2">
-              <span className="material-symbols-outlined text-3xl text-secondary fill">insights</span>
-              <h4 className="text-base font-extrabold text-on-surface">Speech Pacing Index</h4>
-              <span className="px-3 py-1 bg-secondary/15 text-secondary text-xs font-extrabold rounded border border-secondary/20">
+            <div className="bg-surface p-8 rounded-3xl border border-surface-container flex flex-col items-center justify-center shadow-sm space-y-4">
+              <div className="w-16 h-16 bg-secondary/10 rounded-2xl flex items-center justify-center text-secondary mb-2">
+                <span className="material-symbols-outlined text-3xl fill">insights</span>
+              </div>
+              <h4 className="text-lg font-black text-on-surface tracking-tight">Speech Pacing Index</h4>
+              <span className="px-4 py-1.5 bg-secondary/10 text-secondary text-sm font-extrabold rounded-lg border border-secondary/20 shadow-sm">
                 {metrics.pacing} ({metrics.wpm} WPM)
               </span>
-              <p className="text-[10px] text-on-surface-variant font-semibold">Perfect articulation speed index.</p>
             </div>
           </div>
 
           <button
             onClick={() => navigate('/interview')}
-            className="px-6 py-3 bg-primary text-on-primary rounded-xl text-xs font-bold shadow-md hover:bg-primary/95 transition-all cursor-pointer"
+            className="px-8 py-4 bg-primary text-on-primary rounded-2xl text-sm font-black shadow-lg hover:shadow-xl hover:-translate-y-0.5 hover:bg-primary/95 transition-all cursor-pointer mt-4"
           >
-            Return to Dashboard
+            Return to Coaching Studio
           </button>
         </div>
       ) : (
-        /* Simulation Active panel */
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[480px]">
-          {/* Center Stage: AI Avatar & Chat timeline */}
-          <div className="lg:col-span-8 flex flex-col gap-6 h-full">
-            {/* Avatar Stage */}
-            <div className="flex-grow flex flex-col items-center justify-center bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-surface-container relative overflow-hidden min-h-[160px] max-h-[220px]">
-              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-surface-container-low/40 to-transparent pointer-events-none"></div>
-
-              {/* Orbiting geometric sphere */}
-              <div className="w-24 h-24 rounded-full mb-3 relative bg-gradient-to-br from-primary-container/20 to-secondary-container/20 flex items-center justify-center shadow-inner scale-90">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-on-primary shadow-lg ai-glow animate-pulse">
-                  <span className="material-symbols-outlined text-2xl fill animate-spin" style={{ animationDuration: '8s' }}>
-                    auto_awesome
-                  </span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mx-4">
+          
+          {/* FOCAL POINT: The Immersive Question & Chat Stage */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            
+            {/* Massive Question Box */}
+            <div className="bg-surface-container-lowest rounded-3xl p-8 lg:p-12 shadow-premium border border-surface-container relative overflow-hidden flex flex-col justify-center min-h-[260px] shrink-0">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+              
+              <div className="relative z-10 flex gap-6 items-start">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-on-primary shadow-lg shrink-0">
+                  <span className="material-symbols-outlined text-3xl">smart_toy</span>
                 </div>
-                <svg className="absolute inset-0 w-full h-full text-primary/30 animate-spin" style={{ animationDuration: '15s' }} viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeDasharray="3 7" strokeWidth="0.75"></circle>
-                </svg>
-              </div>
-
-              <div className="text-center max-w-xl z-10 space-y-1">
-                <p className="text-[10px] text-primary font-bold uppercase tracking-wider">Active Simulator Question</p>
-                <h3 className="text-xs md:text-sm font-bold text-on-surface leading-relaxed max-h-[60px] overflow-y-auto">
-                  "{questions[currentIdx]?.text}"
-                </h3>
+                
+                <div className="space-y-4">
+                  <p className="text-[10px] text-primary font-extrabold uppercase tracking-[0.2em] flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                    Active Question
+                  </p>
+                  <h3 className="text-xl lg:text-2xl font-black text-on-surface leading-snug tracking-tight">
+                    {questions[currentIdx]?.text}
+                  </h3>
+                </div>
               </div>
             </div>
 
-            {/* Conversational timeline */}
-            <div className="h-72 bg-surface-container-lowest rounded-xl shadow-sm border border-surface-container flex flex-col overflow-hidden shrink-0">
-              <div className="flex-grow p-4 overflow-y-auto space-y-4">
+            {/* Expansive Chat Timeline */}
+            <div className="h-[480px] bg-surface-container-lowest rounded-3xl shadow-sm border border-surface-container flex flex-col overflow-hidden">
+              <div className="flex-grow p-6 lg:p-8 overflow-y-auto space-y-6">
                 {chatHistory.map((msg, i) => (
-                  <div key={i} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-                    <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center font-bold text-xs ${
+                  <div key={i} className={`flex gap-4 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <div className={`w-10 h-10 rounded-2xl shrink-0 flex items-center justify-center font-bold text-[14px] shadow-sm ${
                       msg.sender === 'user' 
                         ? 'bg-primary-container text-on-primary-container'
                         : msg.avatar === 'insights'
-                        ? 'bg-secondary-container text-on-secondary-container border border-secondary/20'
+                        ? 'bg-secondary/10 text-secondary border border-secondary/20'
                         : 'bg-surface-container-high text-on-surface'
                     }`}>
-                      <span className="material-symbols-outlined text-sm">{msg.avatar}</span>
+                      <span className="material-symbols-outlined text-[18px]">{msg.avatar}</span>
                     </div>
 
-                    <div className={`p-3.5 rounded-2xl text-xs leading-relaxed max-w-[80%] ${
+                    <div className={`p-5 rounded-3xl text-sm leading-relaxed max-w-[85%] whitespace-pre-wrap ${
                       msg.sender === 'user'
-                        ? 'bg-primary/5 border border-primary/20 text-on-surface rounded-tr-none'
+                        ? 'bg-primary/5 border border-primary/10 text-on-surface rounded-tr-sm'
                         : msg.avatar === 'insights'
-                        ? 'bg-gradient-to-br from-secondary/5 to-primary/5 border border-secondary/25 text-on-surface rounded-tl-none font-medium'
-                        : 'bg-surface-container-low border border-surface-container-high text-on-surface rounded-tl-none font-medium'
+                        ? 'bg-gradient-to-br from-secondary/5 to-primary/5 border border-secondary/20 text-on-surface rounded-tl-sm font-medium'
+                        : 'bg-surface-container-low text-on-surface rounded-tl-sm font-medium'
                     }`}>
                       {msg.text}
                       
                       {msg.feedback && (
-                        <div className="mt-2.5 pt-2 border-t border-surface-container-highest flex flex-wrap gap-2 text-[9px] font-bold">
-                          <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">Confidence: {msg.feedback.confidenceIndex}%</span>
-                          <span className="px-2 py-0.5 bg-secondary/15 text-secondary rounded">Pacing: {msg.feedback.pacingRateText}</span>
-                          <span className={`px-2 py-0.5 rounded ${msg.feedback.isSTARCompliant ? 'bg-primary/10 text-primary' : 'bg-outline-variant/20 text-outline'}`}>
+                        <div className="mt-4 pt-3 border-t border-surface-container-highest flex flex-wrap gap-2 text-[10px] font-bold">
+                          <span className="px-2.5 py-1 bg-primary/10 text-primary rounded-md">Confidence: {msg.feedback.confidenceIndex}%</span>
+                          <span className="px-2.5 py-1 bg-secondary/10 text-secondary rounded-md">Pacing: {msg.feedback.pacingRateText}</span>
+                          <span className={`px-2.5 py-1 rounded-md ${msg.feedback.isSTARCompliant ? 'bg-primary/10 text-primary' : 'bg-outline-variant/20 text-outline'}`}>
                             {msg.feedback.isSTARCompliant ? 'STAR Structured ✓' : 'No STAR Pattern Detected'}
                           </span>
                         </div>
@@ -419,37 +387,31 @@ export default function InterviewSimulator() {
                 ))}
                 
                 {submitting && (
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-sm animate-spin">autorenew</span>
+                  <div className="flex gap-4 items-center pl-2">
+                    <div className="flex space-x-1 p-4 bg-surface-container-low rounded-2xl rounded-tl-sm justify-center w-20">
+                      <div className="w-2 h-2 bg-outline-variant rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-outline-variant rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-outline-variant rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex space-x-1 p-3 bg-surface-container rounded-xl rounded-tl-none w-16 justify-center">
-                        <div className="w-1.5 h-1.5 bg-outline-variant rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-outline-variant rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                        <div className="w-1.5 h-1.5 bg-outline-variant rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-                      </div>
-                      <span className="text-[10px] text-outline font-bold">AI Coach is auditing speech structure...</span>
-                    </div>
+                    <span className="text-xs text-outline font-bold">AI Coach is auditing structure...</span>
                   </div>
                 )}
-                
-                <div ref={chatEndRef} />
+                <div ref={chatEndRef} className="h-4" />
               </div>
 
-              {/* Chat Input area */}
-              <form onSubmit={handleSubmitAnswer} className="p-3 bg-surface border-t border-surface-container-high flex gap-3 items-center shrink-0">
+              {/* Premium Input Area */}
+              <form onSubmit={handleSubmitAnswer} className="p-4 lg:p-6 bg-surface-container-lowest border-t border-surface-container flex gap-4 items-center shrink-0">
                 <button
                   type="button"
                   onClick={handleMicToggle}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 shadow-sm cursor-pointer ${
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 shrink-0 cursor-pointer ${
                     isRecording
-                      ? 'bg-error text-on-error animate-pulse ring-4 ring-error/30 shadow-lg'
-                      : 'bg-primary text-on-primary hover:bg-primary/95 hover:scale-105 ai-glow'
+                      ? 'bg-error text-on-error animate-pulse ring-4 ring-error/20 shadow-lg'
+                      : 'bg-primary/10 text-primary hover:bg-primary hover:text-on-primary shadow-sm'
                   }`}
-                  title={isRecording ? "Stop voice recording" : "Speak your response (Web Speech)"}
+                  title={isRecording ? "Stop voice recording" : "Speak your response"}
                 >
-                  <span className="material-symbols-outlined text-xl">
+                  <span className="material-symbols-outlined text-2xl">
                     {isRecording ? 'graphic_eq' : 'mic'}
                   </span>
                 </button>
@@ -458,91 +420,92 @@ export default function InterviewSimulator() {
                   type="text"
                   required
                   disabled={submitting || sessionFinished}
-                  placeholder={submitting ? 'AI Coach is analyzing response...' : "Type your technical response here, or click the microphone to simulate your voice answer..."}
+                  placeholder={submitting ? 'Auditing response...' : "Type your response, or use the microphone..."}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  className="flex-grow bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-2.5 text-xs font-semibold text-on-surface focus:border-primary outline-none disabled:opacity-50"
+                  className="flex-grow bg-surface border border-outline-variant/30 rounded-2xl px-6 py-4 text-sm font-semibold text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all shadow-sm"
                 />
 
                 <button
                   type="submit"
                   disabled={!inputValue.trim() || submitting}
-                  className="px-4 py-2.5 bg-surface-container text-primary font-extrabold text-xs hover:bg-surface-container-high rounded-xl transition-all cursor-pointer shrink-0 disabled:opacity-40"
+                  className="px-8 py-4 bg-primary text-on-primary font-black text-sm hover:bg-primary/95 rounded-2xl transition-all cursor-pointer shrink-0 disabled:opacity-40 shadow-md shadow-primary/20"
                 >
-                  Submit Answer
+                  Send
                 </button>
               </form>
             </div>
           </div>
 
-          {/* Right Column: Live coaching metrics */}
-          <aside className="lg:col-span-4 flex flex-col gap-6 h-full shrink-0">
-            {/* Live Metrics */}
-            <div className="bg-surface-container-lowest rounded-xl p-4 border border-surface-container shadow-sm flex-grow">
-              <h3 className="text-xs font-bold text-on-surface mb-4 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-primary text-lg">monitoring</span> Live Coaching Metrics
-              </h3>
+          {/* SECONDARY: Calm, Breathing Metrics Sidebar */}
+          <aside className="lg:col-span-4 flex flex-col gap-6">
+            <div className="bg-transparent flex flex-col gap-6">
               
-              <div className="space-y-4">
-                <div className="bg-surface p-3 rounded-lg border border-surface-variant/20">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-on-surface-variant font-medium">Confidence Index</span>
-                    <span className="text-xs font-bold text-secondary">{metrics.confidence}%</span>
-                  </div>
-                  <div className="w-full bg-surface-container-high rounded-full h-1.5">
-                    <div className="bg-secondary h-1.5 rounded-full transition-all duration-500" style={{ width: `${metrics.confidence}%` }}></div>
-                  </div>
+              {/* Progress Tracker (Soft card) */}
+              <div className="bg-surface-container-lowest rounded-3xl p-8 border border-surface-container/50 shadow-sm flex flex-col gap-4 shrink-0">
+                <div className="flex justify-between items-end mb-2">
+                  <span className="text-[10px] text-outline font-extrabold uppercase tracking-widest">Progress</span>
+                  <span className="text-sm font-black text-on-surface">Q{currentIdx + 1} / 5</span>
                 </div>
-
-                <div className="bg-surface p-3 rounded-lg border border-surface-variant/20">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-on-surface-variant font-medium">Pacing Coefficient</span>
-                    <span className="text-xs font-bold text-primary">{metrics.pacing}</span>
-                  </div>
-                  <div className="w-full bg-surface-container-high rounded-full h-1.5 flex gap-1">
-                    <div className={`h-1.5 rounded-full flex-1 transition-all ${metrics.wpm >= 90 ? 'bg-primary' : 'bg-primary/20'}`}></div>
-                    <div className={`h-1.5 rounded-full flex-1 transition-all ${metrics.wpm >= 115 ? 'bg-primary' : 'bg-primary/20'}`}></div>
-                    <div className={`h-1.5 rounded-full flex-1 transition-all ${metrics.wpm >= 135 ? 'bg-primary/45' : 'bg-primary/20'}`}></div>
-                  </div>
-                  <p className="text-[10px] text-on-surface-variant mt-1.5 font-medium font-mono">
-                    Speed: ~{metrics.wpm} words/minute
-                  </p>
-                </div>
-
-                {/* Progress Indicators */}
-                <div className="bg-surface p-4 rounded-xl border border-surface-container space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-outline font-bold uppercase tracking-wider">Interview Progress</span>
-                    <span className="text-xs font-extrabold text-on-surface">Question {currentIdx + 1} / 5</span>
-                  </div>
-                  <div className="flex gap-1.5">
-                    {[0, 1, 2, 3, 4].map(idx => (
-                      <div 
-                        key={idx} 
-                        className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                          idx < currentIdx 
-                            ? 'bg-primary' 
-                            : idx === currentIdx 
-                            ? 'bg-secondary animate-pulse' 
-                            : 'bg-surface-container-high'
-                        }`} 
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Coach tips */}
-                <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 flex gap-2 items-start mt-2">
-                  <span className="material-symbols-outlined text-primary text-base shrink-0 mt-0.5">insights</span>
-                  <p className="text-[10px] text-on-surface-variant leading-relaxed font-medium">
-                    {feedbackHistory.length > 0 
-                      ? feedbackHistory[feedbackHistory.length - 1].coachingTip 
-                      : "Speak clearly and state concrete Situation-Task-Action-Result examples from your professional career to score highly."}
-                  </p>
+                <div className="flex gap-2 h-2">
+                  {[0, 1, 2, 3, 4].map(idx => (
+                    <div 
+                      key={idx} 
+                      className={`h-full flex-1 rounded-full transition-all duration-500 ${
+                        idx < currentIdx 
+                          ? 'bg-primary' 
+                          : idx === currentIdx 
+                          ? 'bg-primary/40 animate-pulse' 
+                          : 'bg-surface-container-high'
+                      }`} 
+                    />
+                  ))}
                 </div>
               </div>
+
+              {/* Pacing Chip */}
+              <div className="bg-secondary/5 rounded-3xl p-6 border border-secondary/10 flex flex-col justify-center shrink-0">
+                <h4 className="text-[10px] font-extrabold text-secondary uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[14px]">speed</span> Vocal Pacing
+                </h4>
+                <div className="flex items-end gap-2">
+                  <span className="text-2xl font-black text-on-surface tracking-tight">{metrics.wpm}</span>
+                  <span className="text-xs font-bold text-on-surface-variant mb-1">WPM</span>
+                </div>
+                <p className="text-[11px] font-bold text-secondary mt-1">{metrics.pacing}</p>
+              </div>
+
+              {/* Confidence Meter */}
+              <div className="bg-surface-container-lowest rounded-3xl p-6 border border-surface-container/50 shadow-sm flex-grow">
+                <h4 className="text-[10px] font-extrabold text-primary uppercase tracking-widest mb-6 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[14px]">psychology</span> Live Confidence
+                </h4>
+                <div className="flex flex-col items-center justify-center">
+                  <CircularProgress
+                    value={metrics.confidence}
+                    max={100}
+                    size={100}
+                    strokeWidth={8}
+                    color="#6b38d4"
+                    trackColor="#f1f5f9"
+                  >
+                    <span className="text-2xl font-black text-on-surface">{metrics.confidence}%</span>
+                  </CircularProgress>
+                </div>
+                
+                {feedbackHistory.length > 0 && (
+                  <div className="mt-8 pt-6 border-t border-surface-container-high space-y-3">
+                    <p className="text-[10px] font-extrabold text-outline uppercase tracking-wider">Latest Coach Tip</p>
+                    <p className="text-[11px] font-medium text-on-surface-variant leading-relaxed">
+                      "{feedbackHistory[feedbackHistory.length - 1].coachingTip}"
+                    </p>
+                  </div>
+                )}
+              </div>
+
             </div>
           </aside>
+          
         </div>
       )}
     </div>

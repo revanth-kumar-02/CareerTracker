@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateRoadmap } from '../utils/aiService';
 import { saveRoadmap } from '../utils/supabaseClient';
-import { AVAILABLE_ROLES } from '../data/mockData';
+import { AVAILABLE_ROLES } from '../data/staticContent';
 import { useProfile } from '../context/ProfileContext';
 
 export default function RoadmapGenerator() {
@@ -25,7 +25,7 @@ export default function RoadmapGenerator() {
     "Scanning industry skill demands and regional market gaps...",
     "Formulating optimal 3-stage visual timeline parameters...",
     "Curating customized, recommended next-step learning assets...",
-    "Writing active pathway blueprints securely to Supabase..."
+    "Writing active pathway blueprints securely to Cloud..."
   ];
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function RoadmapGenerator() {
       // 3. Keep profile synchronized (updating target role and initial dynamic briefing via context)
       await updateProfile({
         target_role: targetRole,
-        briefing: `Dynamic intelligence briefing active for your path to become a ${targetRole}. Success probability calculated at ${data.successProbability}% based on market telemetry.`
+        briefing: `Dynamic learning trajectory active for your path to become a ${targetRole}. System components are primed.`
       });
 
       // 4. Redirect user to the main Career Roadmap page to display active tracker
@@ -78,7 +78,7 @@ export default function RoadmapGenerator() {
       <div className="min-h-[400px] flex items-center justify-center animate-pulse">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto"></div>
-          <p className="text-xs text-on-surface-variant font-bold">Synchronizing Parameters with Supabase...</p>
+          <p className="text-xs text-on-surface-variant font-bold">Synchronizing Parameters with Cloud...</p>
         </div>
       </div>
     );
@@ -98,7 +98,7 @@ export default function RoadmapGenerator() {
             {loadingMessages[loadingStep]}
           </p>
           <p className="text-[10px] text-on-surface-variant font-semibold">
-            Using higher-tier reasoning engine gemini-2.5-pro for structural validation.
+            Using advanced LLM systems for structural validation.
           </p>
         </div>
       </div>

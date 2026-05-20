@@ -96,6 +96,53 @@
   background-clip: text;
 }
 
+/* ── Support Overlay ────────────────────────── */
+
+/* Animated gradient line at top of panel */
+@keyframes support-gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.support-gradient-line {
+  background: linear-gradient(90deg, #4648d4, #8455ef, #4648d4);
+  background-size: 200% 200%;
+  animation: support-gradient-shift 3.5s ease infinite;
+  opacity: 0.85;
+}
+
+/* Subtle pulse on the support icon bubble */
+@keyframes support-icon-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(70, 72, 212, 0.15); }
+  50%       { box-shadow: 0 0 0 8px rgba(70, 72, 212, 0); }
+}
+
+.support-icon-pulse {
+  animation: support-icon-pulse 2.8s ease-in-out infinite;
+}
+
+/* Custom scrollbar inside the overlay */
+.support-overlay-panel::-webkit-scrollbar {
+  width: 4px;
+}
+.support-overlay-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+.support-overlay-panel::-webkit-scrollbar-thumb {
+  background: #c7c4d7;
+  border-radius: 4px;
+}
+.dark .support-overlay-panel::-webkit-scrollbar-thumb {
+  background: #3a3a5c;
+}
+
+/* Dark mode overrides for support overlay */
+.dark .support-overlay-panel {
+  background-color: #1a1a2e;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
 /* Upload dashed border */
 .upload-dashed {
   background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='12' ry='12' stroke='%23C7C4D7' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
@@ -184,6 +231,29 @@ a, button, select, input, textarea, [class*="hover:"], .transition-all {
   animation-play-state: paused;
 }
 
+/* Theme-aware marquee edge fades — light mode */
+.marquee-fade-left {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 72px;
+  background: linear-gradient(to right, var(--color-surface-container-lowest, #ffffff), transparent);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.marquee-fade-right {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 72px;
+  background: linear-gradient(to left, var(--color-surface-container-lowest, #ffffff), transparent);
+  z-index: 10;
+  pointer-events: none;
+}
+
 /* Glassmorphism improvements */
 .premium-glass {
   background: rgba(255, 255, 255, 0.75);
@@ -205,4 +275,110 @@ a, button, select, input, textarea, [class*="hover:"], .transition-all {
 .shadow-premium-hover:hover {
   box-shadow: 0 2px 6px rgba(0,0,0,0.03), 0 16px 32px -4px rgba(70, 72, 212, 0.08), 0 8px 16px -2px rgba(70, 72, 212, 0.04);
 }
+
+/* ─── Roadmap Animations ─── */
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Dark Mode System */
+.dark {
+  --color-primary: #6366f1;
+  --color-primary-container: #4f46e5;
+  --color-on-primary: #ffffff;
+  --color-secondary: #a855f7;
+  --color-secondary-container: #9333ea;
+  --color-on-secondary: #ffffff;
+
+  --color-surface: #0f172a;
+  --color-surface-dim: #0b0f19;
+  --color-surface-bright: #1e293b;
+  --color-surface-container-lowest: #0b0f19;
+  --color-surface-container-low: #1e293b;
+  --color-surface-container: #1e293b;
+  --color-surface-container-high: #334155;
+  --color-surface-container-highest: #475569;
+  --color-surface-variant: #1e293b;
+  --color-on-surface: #f8fafc;
+  --color-on-surface-variant: #cbd5e1;
+  --color-inverse-surface: #f8fafc;
+  --color-inverse-on-surface: #0f172a;
+
+  --color-background: #0b0f19;
+  --color-on-background: #f8fafc;
+
+  --color-outline: #334155;
+  --color-outline-variant: #1e293b;
+}
+
+.dark body {
+  background-color: #0b0f19;
+  color: #f8fafc;
+}
+
+/* Specific component dark overrides */
+.dark .premium-glass {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.2);
+}
+
+.dark .premium-glass:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.4);
+}
+
+.dark .glass-card {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.dark .upload-dashed {
+  background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='12' ry='12' stroke='%23334155' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+}
+
+.dark .upload-dashed:hover {
+  background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='12' ry='12' stroke='%236366F1' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+}
+
+.dark .roadmap-line::before {
+  background-color: #334155;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Dark mode: marquee edge fades use dark surface */
+.dark .marquee-fade-left {
+  background: linear-gradient(to right, #0b0f19, transparent);
+}
+
+.dark .marquee-fade-right {
+  background: linear-gradient(to left, #0b0f19, transparent);
+}
+
+/* Global Transition for smooth theme switching */
+body {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
 

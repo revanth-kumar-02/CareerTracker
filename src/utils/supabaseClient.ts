@@ -1,15 +1,25 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const demoEmail = import.meta.env.VITE_DEMO_EMAIL || '';
-const demoPassword = import.meta.env.VITE_DEMO_PASSWORD || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn("Supabase environment variables are missing! Database integration might fail.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Global singleton to prevent multiple GoTrueClient warnings on HMR or path casing issues in Vite
+let supabaseInstance: SupabaseClient;
+
+if ((globalThis as any).__careertrack_supabase_instance) {
+  supabaseInstance = (globalThis as any).__careertrack_supabase_instance;
+} else {
+  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+  if (typeof window !== 'undefined') {
+    (window as any).__careertrack_supabase_instance = supabaseInstance;
+  }
+}
+
+export const supabase = supabaseInstance;
 
 export interface SupabaseProfile {
   name: string;
@@ -22,43 +32,9 @@ export interface SupabaseProfile {
   interview_session: any | null;
 }
 
-// Cached session promise to prevent concurrent sign-in requests on mount
-let authPromise: Promise<any> | null = null;
-
 export async function ensureAuth() {
-  if (authPromise) {
-    return authPromise;
-  }
-
-  authPromise = (async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        return session;
-      }
-
-      if (!demoEmail || !demoPassword) {
-        throw new Error("Demo credentials are not configured in environment variables!");
-      }
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: demoEmail,
-        password: demoPassword,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      return data.session;
-    } catch (err) {
-      console.error("Supabase background authentication failed:", err);
-      authPromise = null;
-      throw err;
-    }
-  })();
-
-  return authPromise;
+  const { data: { session } } = await supabase.auth.getSession();
+  return session;
 }
 
 /**
@@ -93,9 +69,11 @@ function parseProfileRow(row: any): SupabaseProfile | null {
  */
 export async function getProfile(): Promise<SupabaseProfile | null> {
   try {
-    const session = await ensureAuth();
+    const session = await ensureAuth().catch(() => null);
     if (!session || !session.user) {
-      return null;
+      // Local fallback if not authenticated
+      const localData = localStorage.getItem('careertrack_offline_profile');
+      return localData ? JSON.parse(localData) : null;
     }
 
     const { data, error } = await supabase
@@ -108,10 +86,15 @@ export async function getProfile(): Promise<SupabaseProfile | null> {
       throw error;
     }
 
-    return parseProfileRow(data);
+    const parsed = parseProfileRow(data);
+    if (parsed) {
+      localStorage.setItem('careertrack_offline_profile', JSON.stringify(parsed));
+    }
+    return parsed;
   } catch (err) {
-    console.error("Error fetching profile from Supabase:", err);
-    return null;
+    console.error("Error fetching profile from Supabase, trying local cache:", err);
+    const localData = localStorage.getItem('careertrack_offline_profile');
+    return localData ? JSON.parse(localData) : null;
   }
 }
 
@@ -119,6 +102,29 @@ export async function getProfile(): Promise<SupabaseProfile | null> {
  * Upserts a profile record back to Supabase.
  */
 export async function upsertProfile(profileUpdates: Partial<SupabaseProfile>): Promise<SupabaseProfile | null> {
+  let offlineFallbackProfile: SupabaseProfile | null = null;
+  try {
+    // Attempt to parse existing local fallback cache to preserve fields offline
+    const cached = localStorage.getItem('careertrack_offline_profile');
+    if (cached) {
+      try {
+        offlineFallbackProfile = JSON.parse(cached);
+      } catch (e) {}
+    }
+  } catch (e) {}
+
+  // Construct initial merged profile for offline use
+  const mergedOfflineProfile: SupabaseProfile = {
+    name: profileUpdates.name !== undefined ? profileUpdates.name : (offlineFallbackProfile?.name || ''),
+    target_role: profileUpdates.target_role !== undefined ? profileUpdates.target_role : (offlineFallbackProfile?.target_role || ''),
+    briefing: profileUpdates.briefing !== undefined ? profileUpdates.briefing : (offlineFallbackProfile?.briefing || ''),
+    streak: profileUpdates.streak !== undefined ? profileUpdates.streak : (offlineFallbackProfile?.streak || 0),
+    xp: profileUpdates.xp !== undefined ? profileUpdates.xp : (offlineFallbackProfile?.xp || 0),
+    roadmap: profileUpdates.roadmap !== undefined ? profileUpdates.roadmap : (offlineFallbackProfile?.roadmap || null),
+    resume_analysis: profileUpdates.resume_analysis !== undefined ? profileUpdates.resume_analysis : (offlineFallbackProfile?.resume_analysis || null),
+    interview_session: profileUpdates.interview_session !== undefined ? profileUpdates.interview_session : (offlineFallbackProfile?.interview_session || null),
+  };
+
   try {
     const session = await ensureAuth();
     if (!session || !session.user) {
@@ -172,10 +178,17 @@ export async function upsertProfile(profileUpdates: Partial<SupabaseProfile>): P
       throw error;
     }
 
-    return parseProfileRow(data);
+    const parsed = parseProfileRow(data);
+    if (parsed) {
+      localStorage.setItem('careertrack_offline_profile', JSON.stringify(parsed));
+    }
+    return parsed;
   } catch (err) {
-    console.error("Error upserting profile in Supabase:", err);
-    return null;
+    console.error("Error upserting profile in Supabase, using localStorage fallback:", err);
+    try {
+      localStorage.setItem('careertrack_offline_profile', JSON.stringify(mergedOfflineProfile));
+    } catch (e) {}
+    return mergedOfflineProfile;
   }
 }
 

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { companies, trendingRoles } from '../data/mockData';
+import { companies, trendingRoles } from '../data/staticContent';
 
 export default function Landing() {
   return (
