@@ -150,6 +150,59 @@
 ::-webkit-scrollbar-thumb:hover { background: #c0c1ff; }
 
 /* Smooth transitions */
-* {
+html {
   scroll-behavior: smooth;
 }
+
+a, button, select, input, textarea, [class*="hover:"], .transition-all {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Premium Marquee Scroll Row */
+@keyframes marquee-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-right {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.animate-marquee-left {
+  animation: marquee-left 45s linear infinite;
+}
+
+.animate-marquee-right {
+  animation: marquee-right 45s linear infinite;
+}
+
+.marquee-container:hover .animate-marquee-left,
+.marquee-container:hover .animate-marquee-right {
+  animation-play-state: paused;
+}
+
+/* Glassmorphism improvements */
+.premium-glass {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(229, 238, 255, 0.6);
+  box-shadow: 0 4px 20px -2px rgba(70, 72, 212, 0.03), 0 2px 8px -1px rgba(70, 72, 212, 0.02);
+}
+
+.premium-glass:hover {
+  border-color: rgba(70, 72, 212, 0.2);
+  box-shadow: 0 12px 30px -4px rgba(70, 72, 212, 0.07), 0 4px 12px -2px rgba(70, 72, 212, 0.04);
+}
+
+.shadow-premium {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02), 0 8px 24px -4px rgba(70, 72, 212, 0.04), 0 4px 12px -2px rgba(70, 72, 212, 0.02);
+}
+
+.shadow-premium-hover:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03), 0 16px 32px -4px rgba(70, 72, 212, 0.08), 0 8px 16px -2px rgba(70, 72, 212, 0.04);
+}
+

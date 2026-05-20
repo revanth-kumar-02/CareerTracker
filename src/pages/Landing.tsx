@@ -16,17 +16,54 @@ export default function Landing() {
         </p>
       </section>
 
-      {/* Company Logos */}
-      <section className="flex flex-wrap justify-center gap-4 md:gap-6 mb-20">
-        {companies.map((company) => (
-          <div
-            key={company}
-            className="px-8 py-3 border border-outline-variant/40 rounded-lg text-on-surface-variant text-lg font-medium hover:border-primary/40 hover:text-primary transition-all duration-200 cursor-default"
-          >
-            {company}
-          </div>
-        ))}
-      </section>
+      {/* Company Logos Infinite Scroll */}
+      {(() => {
+        const row1 = companies.slice(0, 16);
+        const row2 = companies.slice(16);
+        return (
+          <section className="mb-24 overflow-hidden py-4 select-none marquee-container relative">
+            {/* Soft gradient overlays for beautiful fade effect at the edges */}
+            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+
+            <div className="flex flex-col gap-6">
+              {/* Top row (moving left) */}
+              <div className="flex overflow-hidden w-full">
+                <div className="flex gap-4 animate-marquee-left whitespace-nowrap py-1">
+                  {[...row1, ...row1].map((company, idx) => (
+                    <div
+                      key={`${company}-row1-${idx}`}
+                      className="px-6 py-3.5 rounded-xl text-on-surface-variant text-sm font-semibold tracking-wide cursor-pointer shrink-0 premium-glass"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
+                        {company}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bottom row (moving right) */}
+              <div className="flex overflow-hidden w-full">
+                <div className="flex gap-4 animate-marquee-right whitespace-nowrap py-1">
+                  {[...row2, ...row2].map((company, idx) => (
+                    <div
+                      key={`${company}-row2-${idx}`}
+                      className="px-6 py-3.5 rounded-xl text-on-surface-variant text-sm font-semibold tracking-wide cursor-pointer shrink-0 premium-glass"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-secondary/40"></span>
+                        {company}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Trending Roles */}
       <section className="mb-12">
@@ -37,8 +74,8 @@ export default function Landing() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {trendingRoles.map((role) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {trendingRoles.slice(0, 6).map((role) => (
             <div
               key={role.title}
               className="bg-surface-container-lowest rounded-xl p-6 shadow-level-2 border border-surface-container hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer group"

@@ -13,6 +13,8 @@ import MarketInsights from './pages/MarketInsights';
 import InterviewPrep from './pages/InterviewPrep';
 import InterviewSimulator from './pages/InterviewSimulator';
 import CareerRoadmap from './pages/CareerRoadmap';
+import RoadmapGenerator from './pages/RoadmapGenerator';
+import ProfileSettings from './pages/ProfileSettings';
 
 export default function App() {
   return (
@@ -28,10 +30,12 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/discovery" element={<MarketInsights />} />
           <Route path="/roadmap" element={<CareerRoadmap />} />
+          <Route path="/roadmap/generator" element={<RoadmapGenerator />} />
           <Route path="/resume" element={<ResumeLab />} />
           <Route path="/resume/feedback" element={<ResumeFeedback />} />
           <Route path="/interview" element={<InterviewPrep />} />
           <Route path="/interview/simulator" element={<InterviewSimulator />} />
+          <Route path="/profile" element={<ProfileSettings />} />
         </Route>
 
         {/* Catch-all fallback redirection */}
@@ -40,3 +44,4 @@ export default function App() {
     </BrowserRouter>
   );
 }
+
