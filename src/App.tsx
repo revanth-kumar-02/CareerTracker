@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ProfileProvider } from './context/ProfileContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -43,6 +43,41 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// ── Auth redirect guard for OAuth callback handling ───────────────────────
+// When returning from Google OAuth, Supabase redirects to origin with hash
+// fragments. This guard detects the authenticated session and navigates
+// the user to /dashboard programmatically.
+function AuthRedirectGuard({ children }: { children: React.ReactNode }) {
+  const { session, authLoading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if we're returning from an OAuth callback (hash contains tokens)
+    const hasAuthCallback = window.location.hash.includes('access_token') ||
+                            window.location.hash.includes('refresh_token');
+
+    if (!authLoading && session) {
+      navigate('/dashboard', { replace: true });
+    } else if (hasAuthCallback && authLoading) {
+      // Still loading — the effect will re-run when authLoading becomes false
+    }
+  }, [session, authLoading, navigate]);
+
+  // Show loading spinner while processing OAuth callback
+  if (authLoading && (window.location.hash.includes('access_token') || window.location.hash.includes('refresh_token'))) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="space-y-3 text-center">
+          <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto" />
+          <p className="text-xs text-on-surface-variant font-bold tracking-wide">Completing sign-in…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 // ── Inner app (needs AuthProvider in context) ─────────────────────────────
 function AppRoutes() {
   useEffect(() => {
@@ -56,9 +91,9 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public Routes */}
+      {/* Public Routes — wrapped with AuthRedirectGuard for OAuth callback */}
       <Route element={<LandingLayout />}>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<AuthRedirectGuard><Landing /></AuthRedirectGuard>} />
       </Route>
 
       {/* Auth Route — standalone, no layout wrapper */}
